@@ -1,3 +1,5 @@
 TODO
 
 1. Need to develop the project
+2. Need to connect top, test and env
+3. Need to develop the master and slave
