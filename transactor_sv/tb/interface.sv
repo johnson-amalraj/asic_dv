@@ -7,8 +7,9 @@ Description: this is the interface file for transactor model
 TODO :       Need to declare the required interface signals
 */
 // ====================================================
-interface intf (input logic clk,reset);
+interface intf (input logic sys_clk, rst_n);
   
+  logic sys_clk;        // Signal for sys_clk
   logic clk;            // Signal for clk
   logic rst_n;          // Signal for rst_n
   logic sel;            // Signal for sel
@@ -19,7 +20,7 @@ interface intf (input logic clk,reset);
   logic wr_en;          // Signal for wr_en
   
     // Clocking block for master
-    clocking master_cb @(posedge clk);
+    clocking master_cb @(posedge sys_clk);
       default input #1 output #1;
       output sel;
       output en;
@@ -30,7 +31,7 @@ interface intf (input logic clk,reset);
     endclocking
   
     // Clocking block for slave
-    clocking slave_cb @(posedge clk);
+    clocking slave_cb @(posedge sys_clk);
       default input #1 output #1;
       output sel;
       output en;
@@ -41,9 +42,9 @@ interface intf (input logic clk,reset);
     endclocking
   
     // Master modport
-    modport master (clocking master_cb, input clk, rst_n);
+    modport master (clocking master_cb, input sys_clk, rst_n);
   
     // Slave modport
-    modport slave (clocking slave_cb, input clk, rst_n);
+    modport slave (clocking slave_cb, input sys_clk, rst_n);
   
 endinterface

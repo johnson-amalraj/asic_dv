@@ -1,14 +1,11 @@
 // ====================================================
 /*
-Project:     transactor
-Engg Name:   johnson amalraj
-File name:   top.sv
-Description: this is the top file for transactor model
-TODO :       Need to intianiate the master and slave
-             Need to connect the interface
-             Need to dump waves
-             Need to define the timescale
-            
+   Project:     transactor
+   Engg Name:   johnson amalraj
+   File name:   top.sv
+   Description: this is the top file for transactor model
+   TODO :       Need to dump waves
+                Need to define the timescale
 */
 // ====================================================
 
@@ -18,28 +15,31 @@ TODO :       Need to intianiate the master and slave
 module ja_top; 
 
   // Declartion of variables 
-  bit clk;   // Variable for clk
-  bit rst_n; // Variable for rst_n
+  bit sys_clk_en; // Variable for sys_clk_en
+  bit sys_clk;    // Variable for clk
+  bit rst_n;      // Variable for rst_n
 
-    // Block for reset release
-    initial begin // intial value assign
-      clk   = 0;
-      rst_n = 1;
-      #(10ns) // wait for 10ns to release the rst_n
-      rst_n = 0;
-    end
+    // Block to initialize the varaibles
+    initial begin // intial block 
+      sys_clk_en = 0;
+      sys_clk    = 0;
+      rst_n      = 1;
+      #(5ns) // wait for 5ns to enable the sys_clk_en 
+      sys_clk_en = 1;
+    end // intitial block
 
     // Block for Clock genertion
     always begin // always block for clock gen 
-      if (rst_n == 0) begin // if loop for rst_n assert check
-        #(5ns) // delay in ns for clock frequency 
-        clk = !clk; // toggle clock
-      end // if loop rst_n asserted
+      if (sys_clk_en == 1) begin // if sys_clk enable
+        #(1ns) // delay in ns for clock frequency 
+        sys_clk = !sys_clk; // toggle clock
+      end // if loop sys_clk enable
     end // always loop
 
     // Connecting master interface
     intf master_intf
     (
+      .sys_clk (sys_clk),
       .clk     (clk),
       .rst_n   (rst_n),
       .sel     (sel),
@@ -53,6 +53,7 @@ module ja_top;
     // Connecting slave interface
     intf slave_intf 
     (
+      .sys_clk (sys_clk),
       .clk     (clk),
       .rst_n   (rst_n),
       .sel     (sel),

@@ -22,3 +22,14 @@
            -> slave.sv
 
 ### [09-Nov-2022]
+
+       => Started basic updates on start_sim and fsm
+           -> top.sv
+           -> test.sv
+           -> interface.sv
+           -> defines.sv
+           -> env.sv
+           -> master.sv
+           -> slave.sv
+           -> checker.sv
+       => created the bfm files
