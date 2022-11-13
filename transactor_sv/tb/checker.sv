@@ -18,17 +18,14 @@ class checker;
 
     // Constructor
     function new (virtual intf checker_vif);
-
       // Getting the interface
       this.chk_vif = checker_vif;
-
     endfunction
 
     // start_sim
     task start_sim();
 
       $display("--------- [CHECKER] start_sim ---------");
-
       fork // start_sim fork_join
 
         // begin // clk_gen
