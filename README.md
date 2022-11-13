@@ -33,3 +33,10 @@
            -> slave.sv
            -> checker.sv
        => created the bfm files
+
+### [12-Nov-2022]
+
+       => Basic updates on master_fsm
+           -> defines.sv
+           -> env.sv
+           -> master_bfm.sv
