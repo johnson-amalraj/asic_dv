@@ -1,4 +1,4 @@
-UVM_HOME = ../../../pkg/uvm/uvm_1800_2_2020_1_1
+UVM_HOME = ../../uvm/uvm_1800_2_2020_1_1
 FILES = rtl.sv top.sv interface.sv 
 IFILES = Packet.sv Configuration.sv Environment.sv Sequencer.sv Sequence.sv test.sv
 VCS_FLAGS = -sverilog +plusarg_save -timescale=1ns/1ns 
