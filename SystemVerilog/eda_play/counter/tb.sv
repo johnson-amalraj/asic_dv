@@ -10,7 +10,7 @@ module counter_tb; // This is TB to test our design
   
   initial begin
     // to see as a waveform
-    $dumpfile("count.vcd");
+    $dumpfile("sim.vcd");
     $dumpvars(1);
     // initial values
     clk=0; reset=1;
