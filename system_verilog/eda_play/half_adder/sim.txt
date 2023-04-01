@@ -1,0 +1,63 @@
+#! /opt/homebrew/Cellar/icarus-verilog/11.0/bin/vvp
+:ivl_version "11.0 (stable)";
+:ivl_delay_selection "TYPICAL";
+:vpi_time_precision + 0;
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/11.0/lib/ivl/system.vpi";
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/11.0/lib/ivl/vhdl_sys.vpi";
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/11.0/lib/ivl/vhdl_textio.vpi";
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/11.0/lib/ivl/v2005_math.vpi";
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/11.0/lib/ivl/va_math.vpi";
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/11.0/lib/ivl/v2009.vpi";
+S_0x151e047d0 .scope package, "$unit" "$unit" 2 1;
+ .timescale 0 0;
+S_0x151e04940 .scope module, "ha_tb" "ha_tb" 3 3;
+ .timescale 0 0;
+v0x600002c18360_0 .var "a", 0 0;
+v0x600002c183f0_0 .var "b", 0 0;
+v0x600002c18480_0 .net "carry", 0 0, L_0x600003518930;  1 drivers
+v0x600002c18510_0 .net "sum", 0 0, L_0x6000035188c0;  1 drivers
+S_0x151e04ab0 .scope module, "h1" "ha" 3 7, 4 2 0, S_0x151e04940;
+ .timescale 0 0;
+    .port_info 0 /INPUT 1 "a";
+    .port_info 1 /INPUT 1 "b";
+    .port_info 2 /OUTPUT 1 "sum";
+    .port_info 3 /OUTPUT 1 "carry";
+L_0x6000035188c0 .functor XOR 1, v0x600002c18360_0, v0x600002c183f0_0, C4<0>, C4<0>;
+L_0x600003518930 .functor AND 1, v0x600002c18360_0, v0x600002c183f0_0, C4<1>, C4<1>;
+v0x600002c18120_0 .net "a", 0 0, v0x600002c18360_0;  1 drivers
+v0x600002c181b0_0 .net "b", 0 0, v0x600002c183f0_0;  1 drivers
+v0x600002c18240_0 .net "carry", 0 0, L_0x600003518930;  alias, 1 drivers
+v0x600002c182d0_0 .net "sum", 0 0, L_0x6000035188c0;  alias, 1 drivers
+    .scope S_0x151e04940;
+T_0 ;
+    %vpi_call/w 3 10 "$dumpfile", "add.vcd" {0 0 0};
+    %vpi_call/w 3 11 "$dumpvars", 32'sb00000000000000000000000000000001 {0 0 0};
+    %pushi/vec4 0, 0, 1;
+    %store/vec4 v0x600002c18360_0, 0, 1;
+    %pushi/vec4 0, 0, 1;
+    %store/vec4 v0x600002c183f0_0, 0, 1;
+    %delay 5, 0;
+    %pushi/vec4 0, 0, 1;
+    %store/vec4 v0x600002c18360_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0x600002c183f0_0, 0, 1;
+    %delay 5, 0;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0x600002c18360_0, 0, 1;
+    %pushi/vec4 0, 0, 1;
+    %store/vec4 v0x600002c183f0_0, 0, 1;
+    %delay 5, 0;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0x600002c18360_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0x600002c183f0_0, 0, 1;
+    %delay 5, 0;
+    %end;
+    .thread T_0;
+# The file index is used to find the file name in the following table.
+:file_names 5;
+    "N/A";
+    "<interactive>";
+    "-";
+    "tb.sv";
+    "rtl.sv";
