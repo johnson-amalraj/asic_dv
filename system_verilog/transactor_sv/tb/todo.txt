@@ -1,0 +1,7 @@
+TODO
+
+1. Need to develop the project [In Process]
+2. Need to run the project
+3. Need to connect top, test and env [In Process]
+4. Need to develop the master and slave [In Process]
+5. Need to develop the fsm for master and slave [In Process]
