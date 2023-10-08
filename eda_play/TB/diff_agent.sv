@@ -50,18 +50,18 @@ module top;
   
   // Testbench code here
 endmodule
-In the above example, we define two agent modules agent1 and agent2, which have inputs for clock, reset, and data, and outputs for data. We then instantiate these modules in the top-level top module and connect their input and output signals. Finally, we define the clock and reset signals and connect them to the agents.
-
-You can then write your testbench code inside the top module to interact with the agents and verify their behavior. Once you have written your code, you can compile and run it using Icarus Verilog.
-
-To compile and run the above setup using Icarus Verilog, you can use the following commands:
-
-Compile the Verilog files and create an executable:
-Copy code
-iverilog -o tb_file.vvp top_file.sv env_file.sv agent_file.sv driver_file.sv bfm_file.sv
-Run the executable:
-Copy code
-vvp tb_file.vvp
-This will run the simulation and execute the testbench code, which interacts with the DUT (design under test) through the agent and driver, and verifies the output using the BFM.
-
-Note that the actual file names will depend on the names you have used for your files. The iverilog command compiles all the Verilog files and creates an executable file named tb_file.vvp. You can then run this executable using the vvp command to execute the simulation.
+// In the above example, we define two agent modules agent1 and agent2, which have inputs for clock, reset, and data, and outputs for data. We then instantiate these modules in the top-level top module and connect their input and output signals. Finally, we define the clock and reset signals and connect them to the agents.
+// 
+// You can then write your testbench code inside the top module to interact with the agents and verify their behavior. Once you have written your code, you can compile and run it using Icarus Verilog.
+// 
+// To compile and run the above setup using Icarus Verilog, you can use the following commands:
+// 
+// Compile the Verilog files and create an executable:
+// Copy code
+// iverilog -o tb_file.vvp top_file.sv env_file.sv agent_file.sv driver_file.sv bfm_file.sv
+// Run the executable:
+// Copy code
+// vvp tb_file.vvp
+// This will run the simulation and execute the testbench code, which interacts with the DUT (design under test) through the agent and driver, and verifies the output using the BFM.
+// 
+// Note that the actual file names will depend on the names you have used for your files. The iverilog command compiles all the Verilog files and creates an executable file named tb_file.vvp. You can then run this executable using the vvp command to execute the simulation.
