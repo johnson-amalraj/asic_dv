@@ -38,7 +38,7 @@ print(f"-in_rtl value: {rtl_file}")
 print(f"-in_tb value: {tb_file}")
 print(f"-out value: {out_file}")
 
-# iverilog -g2012 -o run.sim tb.sv rtl.sv
+# iverilog -g2012 -o run.sim tb.sv rtl.v
 # vvp run.sim
-iverilog -g2012 -o {out_file}.sim {tb_file}.sv {rtl_file}.sv
+iverilog -g2012 -o {out_file}.sim {tb_file}.sv {rtl_file}.v
 vvp {out_file}.sim
