@@ -15,13 +15,13 @@ out_file = None
 while args:
     arg = args.pop(0)  # Get and remove the first argument
 
-    if arg == '-in_rtl':
+    if arg == '-rtl':
         if args:  # Check if there is a value following '-in_rtl'
             rtl_file = args.pop(0)
         else:
             print("Error: Missing value for -in_rtl")
 
-    elif arg == '-in_tb':
+    elif arg == '-tb':
         if args:  # Check if there is a value following '-in_tb'
             tb_file = args.pop(0)
         else:
