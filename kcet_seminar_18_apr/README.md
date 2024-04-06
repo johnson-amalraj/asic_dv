@@ -20,3 +20,25 @@
 ## CO4    | Create testbenches for digital device under test.                     | K3
 ## CO5    | Design a complete system model using System Verilog.                  | K3
 ## --------------------------------------------------------------------------------------------------
+
+
+## --------------------------------------------------------------------------------------------------
+EDA playground 
+## --------------------------------------------------------------------------------------------------
+
+
+Microchip EDA playgorund
+
+https://www.edaplayground.com/confirmRegistration/3e021e16-904b-4c9e-a75a-af11e83d39fd
+
+support@edaplayground.com
+
+## --------------------------------------------------------------------------------------------------
+## Resources
+## --------------------------------------------------------------------------------------------------
+- EDA playground 
+      https://www.edaplayground.com
+- References
+      https://www.chipverify.com/systemverilog/systemverilog-tutorial
+      https://verificationguide.com/systemverilog/systemverilog-tutorial/
+      https://www.asic-world.com/systemverilog/tutorial.html

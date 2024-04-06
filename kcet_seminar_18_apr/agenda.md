@@ -1,13 +1,10 @@
 Overview of system verilog
+ What and Why Verification 
  language
  why system verilog
- variabel types
- structure
+ variable types (other language basics)
+ ENV TB structure
  UVM introduction
- editor
- github
+ editor (GVIM/VSCode)
+ github, svn file management
  basic protocols I2C, SPI, UART
-Resources
- https://www.chipverify.com/systemverilog/systemverilog-tutorial
- https://verificationguide.com/systemverilog/systemverilog-tutorial/
- https://www.asic-world.com/systemverilog/tutorial.html
