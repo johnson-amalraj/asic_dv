@@ -1,5 +1,5 @@
 // -------------------------------------------------
-// File name   : kcet_sem_ex3_semaphore.sv
+// File name   : kcet_sem_ex4_scoreboard.sv
 // Target      : Implementation of Scoreboard for a Simple DUT
 // Description : The scoreboard_entry_t structure holds the expected and actual outputs for each test case.
 //               The add_scoreboard_entry function is used to add entries to the scoreboard.
