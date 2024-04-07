@@ -16,7 +16,6 @@ module apb_mem #(parameter DEPTH = 5) (
     end
 
     always @(posedge _PCLK or negedge _PRESETn ) begin
-        //#1
         if(!_PRESETn) begin
             _state <= `IDLE;
             foreach(mem[i]) mem[i] = 32'hffffffff;
@@ -29,7 +28,7 @@ module apb_mem #(parameter DEPTH = 5) (
         case (_state)
             `IDLE:                
             begin
-                // $display("[%0t] In Idle State", $time);
+                //$display("[%0t] In Idle State", $time);
                 delay = $urandom;
                 _PSLVERR <= 0;
                 _PREADY <= 0;
@@ -40,7 +39,7 @@ module apb_mem #(parameter DEPTH = 5) (
                 
             `SETUP:
             begin
-                // $display("[%0t] In Setup State", $time);
+                //$display("[%0t] In Setup State", $time);
                 _PREADY <= 0;
                 _PSLVERR<=0;
                 if(_PENABLE) begin
@@ -55,14 +54,13 @@ module apb_mem #(parameter DEPTH = 5) (
                         $error("Invalid data in PWDATA line");
                     end
                     else if(!_PWRITE) begin
-                        _PRDATA <= mem[_PADDR[DEPTH-1:0]];
                         if(mem[_PADDR[DEPTH-1:0]] == 32'hffffffff) begin
                             $display("PADDR is %h and content is %h", _PADDR, mem[_PADDR[DEPTH-1:0]]);
                             _PSLVERR <= 1;
                             $error("Reading data from unwritten address");
                         end
-                        // else
-                        //     _PRDATA <= mem[_PADDR[DEPTH-1:0]];
+                        else
+                            _PRDATA <= mem[_PADDR[DEPTH-1:0]];
                     end
                     _next_state <= `ACCESS;
                 end   
@@ -72,12 +70,11 @@ module apb_mem #(parameter DEPTH = 5) (
 
             `ACCESS:
             begin
-                // $display("[%0t] In Access State", $time);
-                _PREADY <= 0;
+                //$display("[%0t] In Access State", $time);
                 if(_PWRITE && !_PSLVERR) begin
                     mem[_PADDR[DEPTH-1:0]] = #0 _PWDATA;
                 end
-                
+                _PREADY <= 0;
                 if(!_PSEL1)
                     _next_state <= `IDLE;
                 else

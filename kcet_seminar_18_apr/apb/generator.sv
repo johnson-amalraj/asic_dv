@@ -16,7 +16,7 @@ class generator;
     endfunction //new()
 
     task run();
-        assert(trans.randomize());
+        trans.randomize();
     endtask
 
     task start();

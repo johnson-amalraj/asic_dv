@@ -48,13 +48,15 @@ class driver;
             #10;
             drv_intf.drv_cb.PRESETn <= 1;
         end
-        else begin  
-            @(drv_intf.drv_cb);
+        else begin    
             for(i=0; i<trans.PADDR.size(); i++) begin
+                @(drv_intf.drv_cb);
                 setup();
                 @(drv_intf.drv_cb);
                 access();
                 wait(drv_intf.drv_cb.PREADY == 1);
+                if (!(i == trans.PADDR.size()-1))
+                    setup();
             end
         end
         idle();
@@ -67,7 +69,7 @@ class driver;
             forever begin
                 idle();
                 gen2drv.get(trans);
-                // trans.printf("FROM GENERATOR");
+                //trans.printf("FROM GENERATOR");
                 drive();
                 ->drv_done;
             end

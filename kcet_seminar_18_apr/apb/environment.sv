@@ -1,3 +1,10 @@
+`include "generator.sv"
+`include "driver.sv"
+`include "ip_monitor.sv"
+`include "op_monitor.sv"
+`include "ref_model.sv"
+`include "scoreboard.sv"
+
 class environment;
     transaction trans;
     generator gen;
@@ -17,7 +24,7 @@ class environment;
     mailbox #(transaction) rm2sb;
     event drv_done;
 
-    int no_of_testcases;
+    const int no_of_testcases;
     function new(virtual APB_intf intf, int no_of_testcases);
         drv_intf = intf;
         ipmon_intf = intf;

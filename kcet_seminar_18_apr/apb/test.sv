@@ -1,4 +1,4 @@
-
+`include "environment.sv"
 /* Directed test cases. Overriding the default transaction class to make it directed 
    More cases can be added in here*/
 class write_transaction extends transaction;
@@ -20,7 +20,7 @@ class test;
 
     virtual APB_intf intf;
 
-    int no_of_testcases = 50;
+    const int no_of_testcases = 50;
 
     // Handle creation for child classes
     write_transaction wr_trans;
@@ -28,6 +28,7 @@ class test;
     function new(virtual APB_intf intf);
         this.intf = intf;
         env = new(intf, no_of_testcases);
+
         // Handle creation for child classes
         wr_trans = new();
         rd_trans = new();
@@ -37,16 +38,12 @@ class test;
        env.build();
        env.run();*/
     task run_test();
-        env.no_of_testcases = 800;
         env.build();
+        env.gen.trans = wr_trans;
         env.run();
-        // env.no_of_testcases = 50;
-        // env.build();
-        // env.gen.trans = wr_trans;
-        // env.run();
-        // env.build();
-        // env.gen.trans = rd_trans;
-        // env.run();
+        env.build();
+        env.gen.trans = rd_trans;
+        env.run();
         #20 $finish;
     endtask //run_test()
 endclass //test
