@@ -1,11 +1,11 @@
 // -------------------------------------------------
-// File name   : kcet_sem_ex1_mux_2_1.sv
+// File name   : mux_2_1.sv
 // Target      : Design a Testbench for 2x1 Mux Using Gates
 // Description : This testbench instantiates the 2x1 mux module and applies different combinations of inputs (a, b, sel) to verify its functionality. 
 //               Adjust the delays (#10) as needed depending on your simulation time unit. You can add more test cases to further validate the design.
 // Date        : 07-Apr-2024
 // Developer   : Johnson Amalraj
-// Github Link : https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/kcet_sem_ex1_mux_2_1.sv
+// Github Link : https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/mux_2_1.sv
 // -------------------------------------------------
 
 //-------------------------------------

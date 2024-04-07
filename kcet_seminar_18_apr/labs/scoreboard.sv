@@ -1,5 +1,5 @@
 // -------------------------------------------------
-// File name   : kcet_sem_ex4_scoreboard.sv
+// File name   : scoreboard.sv
 // Target      : Implementation of Scoreboard for a Simple DUT
 // Description : The scoreboard_entry_t structure holds the expected and actual outputs for each test case.
 //               The add_scoreboard_entry function is used to add entries to the scoreboard.
@@ -11,7 +11,7 @@
 //               Below is an example implementation of a scoreboard for a simple DUT in SystemVerilog along with a testbench to demonstrate its usage:
 // Date        : 07-Apr-2024
 // Developer   : Johnson Amalraj
-// Github Link : https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/kcet_sem_ex4_scoreboard.sv
+// Github Link : https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/scoreboard.sv
 // -------------------------------------------------
 // TODO Need fix
 

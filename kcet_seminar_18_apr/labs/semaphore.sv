@@ -1,5 +1,5 @@
 // -------------------------------------------------
-// File name   : kcet_sem_ex3_semaphore.sv
+// File name   : semaphore.sv
 // Target      : Implementation and Testing of Semaphore for a Simple DUT
 // Description : Semaphore_t is a simple structure representing the semaphore, containing a single bit lock.
 //               The acquire() function waits until the semaphore becomes available (i.e., lock is 0) and then sets lock to 1 to acquire the semaphore.
@@ -8,7 +8,7 @@
 //               You can extend this testbench to simulate more complex scenarios where multiple processes contend for the semaphore or where the semaphore is used to synchronize access to shared resources.
 // Date        : 07-Apr-2024
 // Developer   : Johnson Amalraj
-// Github Link : https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/kcet_sem_ex3_semaphore.sv
+// Github Link : https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/semaphore.sv
 // -------------------------------------------------
 // TODO Need fix
 

@@ -1,5 +1,5 @@
 // -------------------------------------------------
-// File name   : kcet_sem_ex2_mailbox_mem.sv
+// File name   : mailbox_mem.sv
 // Target      : Implementation of a Mailbox by Allocating Memory
 // Description : mailbox_memory is an array of mailbox_entry_t structures, which represents the mailbox.
 //               num_entries keeps track of the number of entries currently in the mailbox.
@@ -9,7 +9,7 @@
 //               Additionally, you can enhance this implementation by adding features like blocking/non-blocking operations, error handling, and more robust memory management, depending on your requirements.
 // Date        : 07-Apr-2024
 // Developer   : Johnson Amalraj
-// Github Link : https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/kcet_sem_ex2_mailbox_mem.sv
+// Github Link : https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/mailbox_mem.sv
 // -------------------------------------------------
 
 //-------------------------------------
