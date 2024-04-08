@@ -1,11 +1,15 @@
-COMPLILE OPTION:-
+# EDA Playground Link:-
 
--timescale=1ns/1ns +vcs+flush+all +warn=all -sverilog
+## https://www.edaplayground.com/x/3uBz
 
-Testbench + Design:-
+# COMPLILE OPTION:-
 
-System Verilog / Verilog
+## -timescale=1ns/1ns +vcs+flush+all +warn=all -sverilog
 
-Tools Simulator:-
+# Testbench + Design:-
 
-Synopsys VCS 2021.09
+## System Verilog / Verilog
+
+# Tools Simulator:-
+
+## Synopsys VCS 2021.09
