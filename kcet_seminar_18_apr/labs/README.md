@@ -5,8 +5,6 @@
 - [Overview on System Verilog](#overview-on-system-verilog)
 - [Simple Testbench explanation with EDA playground](#simple-testbench-explanation-with-eda-playground)
 - [SystemVerilog Laboratory Exercises](#systemverilog-laboratory-exercises)
-- [List of Experiments](#list-of-experiments)
-- [Course Outcome (for Laboratory)](#course-outcome-for-laboratory)
 - [EDA Playground](#eda-playground)
 - [Resources](#resources)
 - [Directory Structure](#directory-structure)
@@ -19,11 +17,11 @@
 
 - [EDA Playground](https://github.com/johnson-amalraj/asic_dv/tree/master/kcet_seminar_18_apr/eda)
 
-## SystemVerilog Laboratory Exercises
+### SystemVerilog Laboratory Exercises
 
 - [Laboratory Exercises](https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs)
 
-### List of Experiments
+#### List of Experiments
 
 | Sl.No. | Experiment Details                                       | Github Link                                                                                                      |
 | ------ | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------                 |
@@ -32,7 +30,7 @@
 | 3      | Implementation and Testing of Semaphore for a Simple DUT | [semaphore.sv](https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/semaphore.sv)     |
 | 4      | Implementation of Scoreboard for a Simple DUT            | [scoreboard.sv](https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/scoreboard.sv)   |
 
-### Course Outcome (for Laboratory)
+#### Course Outcome (for Laboratory)
 
 After successful completion of the course, the students will be able to:
 
