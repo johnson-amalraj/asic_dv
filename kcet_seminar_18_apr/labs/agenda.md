@@ -1,10 +1,10 @@
 # 1 Overview of SystemVerilog
 
-## What and Why Verification Language
+## 1.1. What and Why Verification Language
 
 A verification language, such as SystemVerilog, is used to create testbenches and verify the functionality and correctness of digital designs. It provides constructs and features that enable the creation of complex test scenarios, random stimulus generation, functional coverage, and assertion-based verification, among others.
 
-## Why SystemVerilog
+## 1.2. Why SystemVerilog
 
 SystemVerilog offers several advantages for verification tasks compared to traditional HDLs like Verilog:
 
@@ -15,20 +15,20 @@ SystemVerilog offers several advantages for verification tasks compared to tradi
 
 # 2 SystemVerilog Testbench Structure
 
-## Overview
+## 2.1. Overview
 An environment (ENV) and testbench (TB) structure in SystemVerilog typically consists of modules and components designed to create a comprehensive environment for verifying a DUT (Design Under Test). This may include stimulus generation, interface models, scoreboards, and monitors.
 
-## Files
+## 2.2. Files
 List of files included in the testbench:
 
 - `testbench.sv`: The main testbench file.
 - `design_module.sv`: The module under test.
 - Other auxiliary files (if any).
 
-## Testbench Architecture
+## 2.3. Testbench Architecture
 Description of the architecture and components of the testbench.
 
-### Components
+### 2.3.1. Components
 - **Testbench Module**: Top-level module that instantiates the DUT and stimulus generators.
 - **Stimulus Generators**: Modules responsible for generating input stimuli.
 - **Monitor**: Module to monitor and check the DUT's outputs.
@@ -37,25 +37,25 @@ Description of the architecture and components of the testbench.
 - **Clock and Reset Drivers**: Modules to drive clock and reset signals.
 - **Test Control Logic**: Logic to control test sequences and scenarios.
 
-### Interconnections
+### 2.3.2. Interconnections
 Explanation of how components are interconnected.
 
-## Test Cases
+## 2.3.3. Test Cases
 List of test cases with descriptions.
 
-### Test Case 1
+### 2.3.4. Test Case 1
 Description of the first test case.
 
-### Test Case 2
+### 2.3.5. Test Case 2
 Description of the second test case.
 
-## Simulation Flow
+## 2.4. Simulation Flow
 Description of the simulation flow, including initialization, stimulus generation, and result verification.
 
-## Simulation Results
+## 2.5. Simulation Results
 Summary of simulation results, including coverage metrics and pass/fail status of test cases.
 
-## Variable Types (Other Language Basics)
+## 2.6. Variable Types (Other Language Basics)
 
 SystemVerilog supports various data types commonly found in programming languages:
 
