@@ -48,6 +48,8 @@ For inquiries, contact: support@edaplayground.com
   - [ASIC World SystemVerilog Tutorial](https://www.asic-world.com/systemverilog/tutorial.html)
 
 ## Directory Structure 
+
+```tree
 .
 ├── eda
 │   ├── README.md
@@ -121,4 +123,5 @@ For inquiries, contact: support@edaplayground.com
     ├── scoreboard.sv
     └── semaphore.sv
 
+```
 9 directories, 64 files
