@@ -1,4 +1,4 @@
-# Overview of SystemVerilog
+# 1 Overview of SystemVerilog
 
 ## What and Why Verification Language
 
@@ -13,7 +13,7 @@ SystemVerilog offers several advantages for verification tasks compared to tradi
 - **Integration with HDL:** SystemVerilog seamlessly integrates with Verilog, allowing designers to use a single language for both design and verification.
 - **UVM Support:** SystemVerilog is the foundation for the Universal Verification Methodology (UVM), a standardized methodology for verifying digital designs.
 
-# SystemVerilog Testbench Structure
+# 2 SystemVerilog Testbench Structure
 
 ## Overview
 An environment (ENV) and testbench (TB) structure in SystemVerilog typically consists of modules and components designed to create a comprehensive environment for verifying a DUT (Design Under Test). This may include stimulus generation, interface models, scoreboards, and monitors.
@@ -55,9 +55,6 @@ Description of the simulation flow, including initialization, stimulus generatio
 ## Simulation Results
 Summary of simulation results, including coverage metrics and pass/fail status of test cases.
 
-## Conclusion
-Closing remarks and future work (if any).
-
 ## Variable Types (Other Language Basics)
 
 SystemVerilog supports various data types commonly found in programming languages:
@@ -67,54 +64,13 @@ SystemVerilog supports various data types commonly found in programming language
 - **Enumerated Types:** `enum {IDLE, ACTIVE, DONE}`, for defining a set of named values.
 - **Arrays and Structures:** `int data_array[15:0]`, `struct { int x; int y; } point`.
 
-## UVM Introduction
-
-The Universal Verification Methodology (UVM) is a standardized methodology for verifying digital designs using SystemVerilog. It provides a set of guidelines, reusable components, and a methodology for creating modular and scalable testbenches.
-
-## Specification Understanding:
+# 3 Specification Understanding:
 
 The specification understanding is nothing but need to understand the design completly, and develop test plan, test cases, coverage, assertion, test bench
 
-## What are SystemVerilog/UVM Simulators?
+# 4 SystemVerilog Data Types: logic and wire
 
-SystemVerilog/UVM simulators are tools used in electronic design automation (EDA) for verifying digital designs. SystemVerilog is a hardware description and verification language that extends Verilog with various features for design and verification. UVM (Universal Verification Methodology) is a standardized methodology for verifying integrated circuit designs using SystemVerilog.
-
-## Popular SystemVerilog/UVM Simulators:
-
-   ### 1. QuestaSim
-   
-   - **Vendor:** Mentor Graphics (A Siemens Business)
-   - **Description:** QuestaSim is a high-performance simulation and debugging tool for both SystemVerilog and UVM-based verification environments. It supports advanced features such as assertion-based verification, coverage-driven verification, and transaction-level modeling.
-   - **Website:** [QuestaSim](https://www.mentor.com/products/fv/questa/)
-   
-   ### 2. VCS (Verilog Compiler Simulator)
-   
-   - **Vendor:** Synopsys
-   - **Description:** VCS is a widely-used simulation tool that supports SystemVerilog and UVM. It offers high-performance simulation capabilities, including support for advanced verification methodologies and low-power design verification.
-   - **Website:** [VCS](https://www.synopsys.com/verification/simulation/vcs.html)
-   
-   ### 3. Incisive Enterprise Simulator
-   
-   - **Vendor:** Cadence Design Systems
-   - **Description:** Incisive is a comprehensive verification solution that includes simulation, formal verification, and emulation. It supports SystemVerilog and UVM for verification of complex SoCs (System on Chips) and other digital designs.
-   - **Website:** [Incisive Enterprise Simulator](https://www.cadence.com/en_US/home/tools/system-design-and-verification/simulation-and-testbench-verification/incisive-enterprise-simulator.html)
-   
-## Benefits of Using SystemVerilog/UVM Simulators:
-   
-- **Increased Productivity:** Simulators provide fast and efficient verification of digital designs, reducing time-to-market for products.
-- **Advanced Debugging:** Simulators offer powerful debugging features, including waveform viewers, code coverage analysis, and assertion-based debugging.
-- **Compatibility:** SystemVerilog/UVM simulators support industry-standard verification methodologies, ensuring compatibility with existing design and verification environments.
-- **Scalability:** Simulators can scale to handle designs of varying complexities, from small IP blocks to large SoCs.
-   
-## Conclusion
-   
-SystemVerilog/UVM simulators play a crucial role in the verification of digital designs, offering advanced features for efficient and reliable verification. Whether it's for small IP blocks or complex SoCs, these simulators provide the necessary tools to ensure the correctness and quality of digital designs.
-   
-Feel free to ask if you need further details or specific information on any of the mentioned simulators!
-
-# SystemVerilog Data Types: logic and wire
-
-## logic Data Type
+## 4.1. logic Data Type
 
 - **Description**: The `logic` data type in SystemVerilog represents a single-bit binary value. It can take four states: 0, 1, Z (high-impedance), and X (unknown).
 - **Usage**: Used for representing single-bit signals or variables in RTL (Register Transfer Level) designs.
@@ -127,7 +83,7 @@ Feel free to ask if you need further details or specific information on any of t
   logic my_signal;
   ```
 
-## wire Data Type
+## 4.2. wire Data Type
 
 - **Description**: The `wire` data type in SystemVerilog represents a net that transports values between modules or gates. It is used to connect outputs of one module to inputs of another module.
 - **Usage**: Primarily used for connecting modules in structural designs.
@@ -140,7 +96,7 @@ Feel free to ask if you need further details or specific information on any of t
   wire my_wire;
   ```
 
-## Differences between logic and wire
+## 4.3. Differences between logic and wire
 
 - **Behavior**: 
   - `logic`: Represents a single-bit value and is used for storing state information.
@@ -162,17 +118,11 @@ Feel free to ask if you need further details or specific information on any of t
   - `logic`: Provides more flexibility as it can represent different states (0, 1, Z, X).
   - `wire`: Primarily used for connecting components, less flexible in terms of state representation.
 
-## These data types play crucial roles in designing and connecting components in SystemVerilog, facilitating the creation of complex digital designs.
-
-## Variables
-
-Certainly! Below is information about variables in SystemVerilog presented in Markdown format:
-
-# Variables in SystemVerilog
+# 5. Variables in SystemVerilog
 
 Variables in SystemVerilog are used to store data values during simulation or synthesis. They play a crucial role in representing state information, passing data between modules, and performing computations within a design. SystemVerilog provides various types of variables to accommodate different data types and usage scenarios.
 
-## Variable Declaration
+## 5.1. Variable Declaration
 
 Variables in SystemVerilog are declared using the `logic`, `integer`, `real`, or `bit` data types, along with optional size and signedness modifiers.
 
@@ -192,36 +142,36 @@ real my_real_var;
 bit [31:0] my_bit_var;
 ```
 
-## Data Types
+## 5.2. Data Types
 
-### 1. `logic`
+### 5.2.1. `logic`
 
 - **Description**: Represents a single-bit binary value with four states: 0, 1, Z (high-impedance), and X (unknown).
 - **Declaration Syntax**: `logic [size-1:0] var_name;`
 
-### 2. `integer`
+### 5.2.2. `integer`
 
 - **Description**: Represents a signed integer value.
 - **Declaration Syntax**: `int [size-1:0] var_name;` or `int var_name;`
 
-### 3. `real`
+### 5.2.3. `real`
 
 - **Description**: Represents a real number (floating-point).
 - **Declaration Syntax**: `real var_name;`
 
-### 4. `bit`
+### 5.2.4. `bit`
 
 - **Description**: Represents a single-bit binary value, similar to `logic`, but without the X and Z states.
 - **Declaration Syntax**: `bit [size-1:0] var_name;` or `bit var_name;`
 
-## Usage
+## 5.3. Usage
 
 - **State Storage**: Variables are used to store state information within modules or processes.
 - **Computation**: Variables are used to perform arithmetic, logical, and bitwise operations.
 - **Data Passing**: Variables facilitate passing data between modules and subroutines.
 - **Loop Counters**: Integer variables are commonly used as loop counters in procedural blocks.
 
-## Lifetime
+## 5.4. Lifetime
 
 Variables in SystemVerilog have different lifetimes depending on their scope and declaration location:
 
@@ -229,11 +179,11 @@ Variables in SystemVerilog have different lifetimes depending on their scope and
 - **Static**: Variables declared with the `static` keyword retain their values across multiple invocations of the containing block.
 - **Module**: Variables declared at the module level have lifetime for the entire simulation duration.
 
-# Loops in SystemVerilog
+# 6 Loops in SystemVerilog
 
 SystemVerilog provides several types of loops that allow designers to iterate over a set of statements or execute a block of code multiple times. These loops are essential for performing repetitive tasks and controlling the flow of execution within a design.
 
-## 1. `for` Loop
+## 6.1. `for` Loop
 
 The `for` loop in SystemVerilog iterates over a range of values and executes a block of code for each iteration.
 
@@ -253,7 +203,7 @@ for (int i = 0; i < 10; i++) begin
 end
 ```
 
-## 2. `while` Loop
+## 6.2. `while` Loop
 
 The `while` loop in SystemVerilog repeatedly executes a block of code as long as a specified condition is true.
 
@@ -275,7 +225,7 @@ while (count < 5) begin
 end
 ```
 
-## 3. `do-while` Loop
+## 6.3. `do-while` Loop
 
 The `do-while` loop in SystemVerilog is similar to the `while` loop but ensures that the block of code is executed at least once before checking the condition.
 
@@ -297,18 +247,18 @@ do begin
 end while (num > 0);
 ```
 
-## Loop Control Statements
+## 7 Loop Control Statements
 
 SystemVerilog also provides loop control statements to control the flow of execution within loops:
 
 - **`break`**: Terminates the loop and transfers control to the next statement after the loop.
 - **`continue`**: Skips the remaining statements in the current iteration and proceeds to the next iteration.
 
-## Types of Arrays
+## 7.1. Types of Arrays
 
 SystemVerilog supports several types of arrays:
 
-### 1. Packed Arrays
+### 7.1.1. Packed Arrays
 
 Packed arrays are declared with a single range specifier and are packed into a contiguous block of bits in memory.
 
@@ -320,7 +270,7 @@ Packed arrays are declared with a single range specifier and are packed into a c
 bit [7:0] byte_array [10];
 ```
 
-### 2. Unpacked Arrays
+### 7.1.2. Unpacked Arrays
 
 Unpacked arrays are declared with multiple range specifiers and can be multi-dimensional.
 
@@ -332,7 +282,7 @@ Unpacked arrays are declared with multiple range specifiers and can be multi-dim
 logic [3:0] matrix [4][4];
 ```
 
-### 3. Dynamic Arrays
+### 7.1.3. Dynamic Arrays
 
 Dynamic arrays have a variable size that can be changed dynamically during simulation.
 
@@ -345,7 +295,7 @@ Dynamic arrays have a variable size that can be changed dynamically during simul
 logic [7:0] dynamic_array [];
 ```
 
-## Accessing Array Elements
+## 7.2. Accessing Array Elements
 
 Array elements are accessed using indexing. In SystemVerilog, array indices start from 0.
 
@@ -356,7 +306,7 @@ byte_array[0] = 8'hFF;  // Assigning a value to the first element of byte_array
 value = matrix[2][3];   // Accessing an element from a multi-dimensional array
 ```
 
-## Array Methods and Functions
+## 7.3. Array Methods and Functions
 
 SystemVerilog provides several built-in methods and functions for working with arrays:
 
@@ -365,11 +315,11 @@ SystemVerilog provides several built-in methods and functions for working with a
 - **`array.delete(index)`**: Deletes an element at the specified index.
 - **`array.min()` and `array.max()`**: Returns the minimum and maximum values in the array, respectively.
 
-# Tasks and Functions in SystemVerilog
+# 8 Tasks and Functions in SystemVerilog
 
 Tasks and functions are procedural blocks in SystemVerilog used to encapsulate reusable pieces of code. They enhance code readability, maintainability, and reusability by allowing designers to break down complex operations into smaller, modular units.
 
-## Tasks
+## 8.1. Tasks
 
 Tasks in SystemVerilog are procedural blocks that contain a sequence of statements. They are commonly used for executing a series of actions or procedures.
 
@@ -404,7 +354,7 @@ task my_task(int param1, int param2);
 endtask
 ```
 
-## Functions
+## 8.2. Functions
 
 Functions in SystemVerilog are similar to tasks but return a single value. They are used for performing computations and returning results.
 
@@ -438,7 +388,7 @@ function int add(int a, int b);
 endfunction
 ```
 
-## Differences between Tasks and Functions
+## 8.3. Differences between Tasks and Functions
 
 - **Return Type**:
   - Tasks do not return any value, whereas functions return a single value.
@@ -455,7 +405,7 @@ endfunction
   - Tasks can have input and output arguments.
   - Functions can have input, output, or inout arguments.
 
-# Threads in SystemVerilog
+# 9 Threads in SystemVerilog
 
 Threads in SystemVerilog are concurrent blocks of code that can execute independently and asynchronously. They are used for modeling concurrent behavior and parallel execution in hardware designs.
 
@@ -463,7 +413,7 @@ Threads in SystemVerilog are concurrent blocks of code that can execute independ
 
 SystemVerilog supports several types of threads:
 
-### 1. `initial` and `always` Blocks
+### 9.1. `initial` and `always` Blocks
 
 - **`initial` Blocks**: Execute once at the beginning of simulation.
 - **`always` Blocks**: Execute continuously based on specified conditions or events.
@@ -480,7 +430,7 @@ always @(posedge clk) begin
 end
 ```
 
-### 2. Fork-Join Blocks
+### 9.2. Fork-Join Blocks
 
 - **`fork`-`join` Blocks**: Execute multiple threads concurrently within a single process.
 
@@ -501,7 +451,7 @@ initial begin
 end
 ```
 
-### 3. `fork`-`join_none` Blocks
+### 9.3. `fork`-`join_none` Blocks
 
 - **`fork`-`join_none` Blocks**: Similar to `fork`-`join` blocks, but do not wait for child threads to complete before proceeding.
 
@@ -523,7 +473,7 @@ initial begin
 end
 ```
 
-## Thread Control Statements
+## 9.4 Thread Control Statements
 
 SystemVerilog provides several thread control statements to control the execution of threads:
 
@@ -554,13 +504,13 @@ end
 
 Threads in SystemVerilog are powerful constructs for modeling concurrent behavior and parallel execution in hardware designs. Understanding the different types of threads, thread control statements, and their usage enables efficient design implementation and simulation.
 
-# Inter-Process Communication (IPC) in SystemVerilog
+# 10 Inter-Process Communication (IPC) in SystemVerilog
 
 Inter-process communication (IPC) in SystemVerilog allows different concurrent processes to exchange data or synchronize their execution. SystemVerilog provides several mechanisms for IPC, including shared variables, events, semaphores, and mailbox queues. Below is an overview of these IPC mechanisms presented in Markdown format:
 
 Inter-Process Communication (IPC) in SystemVerilog facilitates communication and synchronization between different concurrent processes within a design. It enables coordination and data exchange among modules, tasks, functions, and threads.
 
-## 1. Shared Variables
+## 10.1. Shared Variables
 
 Shared variables are variables accessible by multiple processes. They allow processes to read and update shared data. However, shared variables may introduce race conditions and synchronization issues.
 
@@ -570,7 +520,7 @@ Shared variables are variables accessible by multiple processes. They allow proc
 int shared_variable;
 ```
 
-## 2. Events
+## 10.2. Events
 
 Events are synchronization objects used to signal the occurrence of an event from one process to another. Processes can wait for events to be triggered before proceeding with their execution.
 
@@ -580,7 +530,7 @@ Events are synchronization objects used to signal the occurrence of an event fro
 event evt;
 ```
 
-## 3. Semaphores
+## 10.3. Semaphores
 
 Semaphores are synchronization primitives used to control access to shared resources. They provide mutual exclusion and allow only one process to access a shared resource at a time.
 
@@ -590,7 +540,7 @@ Semaphores are synchronization primitives used to control access to shared resou
 semaphore sem;
 ```
 
-## 4. Mailbox Queues
+## 10.4. Mailbox Queues
 
 Mailbox queues are FIFO (First-In-First-Out) data structures used for asynchronous communication between processes. They allow processes to send and receive messages asynchronously.
 
@@ -600,9 +550,9 @@ Mailbox queues are FIFO (First-In-First-Out) data structures used for asynchrono
 mailbox mb;
 ```
 
-## IPC Usage Examples
+## 10.5. IPC Usage Examples
 
-### 1. Using Events for Synchronization:
+### 10.5.1. Using Events for Synchronization:
 
 ```systemverilog
 event evt;
@@ -620,7 +570,7 @@ initial begin
 end
 ```
 
-### 2. Using Semaphores for Mutual Exclusion:
+### 10.5.2. Using Semaphores for Mutual Exclusion:
 
 ```systemverilog
 semaphore sem;
@@ -640,12 +590,12 @@ initial begin
 end
 ```
 
-# Object-Oriented Programming (OOP) Concepts in SystemVerilog
+# 11 Object-Oriented Programming (OOP) Concepts in SystemVerilog
 Object-oriented programming (OOP) concepts can be implemented in SystemVerilog using classes and objects. SystemVerilog supports a limited form of object-oriented programming, allowing designers to define classes with member variables and methods. Below is an overview of OOP concepts in SystemVerilog presented in Markdown format:
 
 Object-oriented programming (OOP) concepts in SystemVerilog enable designers to encapsulate data and functionality into objects, facilitating code reuse, modularity, and maintainability. SystemVerilog supports OOP features such as classes, objects, inheritance, and polymorphism.
 
-## 1. Classes and Objects
+## 11.1. Classes and Objects
 
 ### Classes
 
@@ -680,7 +630,7 @@ Rectangle rect = new Rectangle(5, 10);
 int rect_area = rect.area();  // Calling method to calculate area
 ```
 
-## 2. Inheritance
+## 11.2. Inheritance
 
 Inheritance allows a class (subclass) to inherit properties and behavior from another class (superclass). It promotes code reuse and facilitates hierarchical modeling.
 
@@ -706,7 +656,7 @@ Square sqr = new Square(5);
 int sqr_area = sqr.area();  // Inherits area() method from Rectangle
 ```
 
-## 3. Polymorphism
+## 11.3. Polymorphism
 
 Polymorphism allows objects of different classes to be treated as objects of a common superclass. It enables dynamic method dispatch and promotes flexibility in code design.
 
@@ -728,9 +678,9 @@ int area1 = obj1.area();  // Calls area() method of Rectangle
 int area2 = obj2.area();  // Calls area() method of Square
 ```
 
-# SystemVerilog Regions
+# 12 SystemVerilog Regions
 
-## Active Region
+## 12.1. Active Region
 Active regions are executed immediately when encountered during simulation.
 
 Syntax:
@@ -739,7 +689,7 @@ Syntax:
 // Code within this region is executed immediately
 ```
 
-## Reactive Region
+## 12.2. Reactive Region
 Reactive regions execute in response to an event, such as a signal change or an assertion.
 
 Syntax:
@@ -748,7 +698,7 @@ Syntax:
 // Code within this region is executed in response to an event
 ```
 
-## Postponed Region
+## 12.3. Postponed Region
 Postponed regions delay the execution of code until a later simulation time.
 
 Syntax:
@@ -757,7 +707,7 @@ Syntax:
 // Code within this region is executed after other immediate regions
 ```
 
-## Observed Region
+## 12.4. Observed Region
 Observed regions are used for debugging purposes to monitor the values of variables or signals during simulation.
 
 Syntax:
@@ -768,13 +718,13 @@ Syntax:
 
 ## These regions provide a way to control the execution and behavior of code in SystemVerilog, allowing for better simulation control, debugging, and synthesis optimization.
 
-# Interfaces in SystemVerilog
+# 13 Interfaces in SystemVerilog
 
 Certainly! Below is an overview of interfaces in SystemVerilog, including virtual interfaces, modports, and clocking blocks, presented in Markdown format:
 
 Interfaces in SystemVerilog provide a way to define a bundle of signals and methods for communicating between different modules or blocks. They facilitate modular design, encapsulation, and reusability in hardware designs.
 
-## 1. Virtual Interfaces
+## 13.1. Virtual Interfaces
 
 Virtual interfaces in SystemVerilog provide a mechanism for connecting different modules without specifying the physical interface signals. They enable hierarchical design and simplify connectivity between modules.
 
@@ -819,7 +769,7 @@ module top;
 endmodule
 ```
 
-## 2. Modports
+## 13.2. Modports
 
 Modports in SystemVerilog allow interfaces to expose different sets of signals and methods to different modules. They provide flexibility in interface usage by allowing modules to access only the required subset of signals and methods.
 
@@ -855,7 +805,7 @@ module slave_module(bus_interface.slave intf);
 endmodule
 ```
 
-## 3. Clocking Blocks
+## 13.3. Clocking Blocks
 
 Clocking blocks in SystemVerilog provide a way to encapsulate clock and timing-related signals for synchronous communication. They ensure proper synchronization and timing control in hardware designs.
 
@@ -893,15 +843,15 @@ endmodule
 
 Interfaces in SystemVerilog, including virtual interfaces, modports, and clocking blocks, provide powerful mechanisms for defining communication protocols, encapsulating signals and methods, and ensuring proper synchronization and timing control in hardware designs.
 
-# Timescale in SystemVerilog
+# 14 Timescale in SystemVerilog
 
 The timescale in SystemVerilog defines the units of time used for simulation. It consists of two components: `timeunit` and `timeprecision`. The timescale determines the resolution and precision of time-related operations and delays in the simulation.
 
-## 1. `timeunit`
+## 14.1. `timeunit`
 
 The `timeunit` component of the timescale specifies the basic time unit used for simulation. It defines the smallest unit of time that can be represented in the simulation.
 
-## 2. `timeprecision`
+## 14.2. `timeprecision`
 
 The `timeprecision` component of the timescale specifies the precision of time-related values and expressions. It defines the number of decimal places used to represent time values.
 
@@ -921,13 +871,13 @@ The syntax for specifying the timescale in SystemVerilog is as follows:
 
 This example sets the timescale to 1 nanosecond (`1ns`) for the `timeunit` and 1 picosecond (`1ps`) for the `timeprecision`. This means that time-related values and delays in the simulation are represented with nanosecond resolution and picosecond precision.
 
-## Importance of Timescale
+## 14.3. Importance of Timescale
 
 - **Simulation Accuracy**: The timescale affects the accuracy of simulation results by determining the resolution and precision of time-related operations.
 - **Simulation Speed**: A smaller timescale may result in longer simulation times due to increased precision, while a larger timescale may reduce simulation time but may sacrifice accuracy.
 - **Compatibility**: It is essential to use a timescale that is compatible with the simulation requirements and timing constraints of the design being simulated.
 
-## Default Timescale
+## 14.4. Default Timescale
 
 If the timescale is not explicitly specified in a SystemVerilog source file, the simulator uses a default timescale. The default timescale may vary depending on the simulator and simulation environment.
 
@@ -935,35 +885,35 @@ If the timescale is not explicitly specified in a SystemVerilog source file, the
 
 The timescale in SystemVerilog plays a crucial role in determining the accuracy, precision, and performance of simulations. Understanding how to specify and adjust the timescale according to simulation requirements is essential for achieving accurate and efficient simulation results.
 
-# Coverage in SystemVerilog
+# 15 Coverage in SystemVerilog
 
 Coverage in SystemVerilog is a mechanism used to measure how thoroughly a design has been exercised during simulation. It provides visibility into the verification process by tracking which parts of the design have been tested and which parts still need testing.
 
-## 1. Types of Coverage
+## 15.1. Types of Coverage
 
 SystemVerilog supports various types of coverage metrics to measure different aspects of design verification:
 
-### 1.1. Statement Coverage
+### 15.1.1. Statement Coverage
 
 Statement coverage measures the percentage of statements in the design code that have been executed during simulation.
 
-### 1.2. Branch Coverage
+### 15.1.2. Branch Coverage
 
 Branch coverage measures the percentage of decision points (branches) in the code that have been taken or not taken during simulation.
 
-### 1.3. Expression Coverage
+### 15.1.3. Expression Coverage
 
 Expression coverage measures the percentage of Boolean expressions in the code that have been evaluated to true or false during simulation.
 
-### 1.4. Toggle Coverage
+### 15.1.4. Toggle Coverage
 
 Toggle coverage measures the percentage of signal toggles (transitions from 0 to 1 or 1 to 0) in the design signals during simulation.
 
-### 1.5. FSM Coverage
+### 15.1.5. FSM Coverage
 
 FSM (Finite State Machine) coverage measures the percentage of states and state transitions exercised in the design's state machine during simulation.
 
-## 2. Coverage Groups
+## 15.2. Coverage Groups
 
 Coverage groups in SystemVerilog provide a way to group coverage points and specify sampling intervals and thresholds for coverage metrics.
 
@@ -984,7 +934,7 @@ covergroup statement_coverage;
 endgroup
 ```
 
-## 3. Coverpoints and Bins
+## 15.3. Coverpoints and Bins
 
 Coverpoints in SystemVerilog define the design elements to be covered, while bins define the ranges or conditions that constitute coverage for those elements.
 
@@ -1006,7 +956,7 @@ covergroup expression_coverage;
 endgroup
 ```
 
-## 4. Cross Coverage
+## 15.4. Cross Coverage
 
 Cross coverage in SystemVerilog measures interactions between different coverpoints or between different instances of the same coverpoint.
 
@@ -1022,7 +972,7 @@ cross cross_name = cross_type(coverpoint1, coverpoint2, ...);
 cross cp = or(coverpoint1, coverpoint2);
 ```
 
-## 5. Assertions and Coverage
+## 15.5. Assertions and Coverage
 
 Assertions in SystemVerilog can be used to specify expected behavior, and coverage can be used to measure how well those assertions are exercised during simulation.
 
@@ -1042,11 +992,11 @@ cover property(prop1);
 
 Coverage in SystemVerilog is a vital aspect of design verification, providing visibility into the completeness of the verification process. By measuring different coverage metrics and tracking which parts of the design have been tested, engineers can ensure thorough verification and improve the quality of their designs.
 
-# Assertions in SystemVerilog
+# 16 Assertions in SystemVerilog
 
 Assertions in SystemVerilog are constructs used to specify desired behavior or constraints within a design. They enable designers to define properties that must hold true during simulation, aiding in design verification and debugging.
 
-## 1. Immediate Assertions
+## 16.1. Immediate Assertions
 
 Immediate assertions in SystemVerilog are evaluated immediately when they are encountered in the code. They check the specified condition and generate an error if the condition evaluates to false.
 
@@ -1062,7 +1012,7 @@ assert(condition);
 assert(enable == 1) else $error("Enable signal is not asserted");
 ```
 
-## 2. Concurrent Assertions
+## 16.2. Concurrent Assertions
 
 Concurrent assertions in SystemVerilog are continuously evaluated during simulation. They check the specified condition continuously and generate an error if the condition evaluates to false.
 
@@ -1086,7 +1036,7 @@ endproperty
 assert rising_edge(property_name);
 ```
 
-## 3. Sequence Assertions
+## 16.3. Sequence Assertions
 
 Sequence assertions in SystemVerilog specify patterns of events or signal transitions that must occur within a specified timeframe. They provide a powerful mechanism for specifying complex temporal behavior.
 
@@ -1118,7 +1068,7 @@ endproperty
 assert rising_edge_property;
 ```
 
-## 4. Assertion Control Directives
+## 16.4. Assertion Control Directives
 
 SystemVerilog provides several assertion control directives to control the behavior of assertions during simulation. These directives include `disable`, `enable`, `expect`, `cover`, and `sequence`.
 
@@ -1136,11 +1086,11 @@ sequence sequence_name;
 
 Assertions in SystemVerilog are powerful constructs for specifying desired behavior and constraints within a design. Whether immediate, concurrent, or sequence-based, assertions help in design verification by ensuring that the design behaves as expected and meets the specified requirements.
 
-# Randomization in SystemVerilog
+# 17 Randomization in SystemVerilog
 
 Randomization in SystemVerilog is a powerful feature used to generate random values for variables or objects during simulation. It enables efficient stimulus generation for testbenches and helps in achieving comprehensive verification of designs by exploring different scenarios and corner cases.
 
-## 1. Random Variables
+## 17.1. Random Variables
 
 Random variables in SystemVerilog are declared using the `rand` keyword. They can have constraints specified using the `constraint` keyword.
 
@@ -1158,7 +1108,7 @@ rand int data;
 constraint data_constraint { data inside {[0:255]}; }
 ```
 
-## 2. Random Objects
+## 17.2. Random Objects
 
 Random objects in SystemVerilog are instances of user-defined classes that have been declared with the `rand` keyword. They can have random variables and constraints associated with them.
 
@@ -1177,11 +1127,11 @@ endclass
 MyClass obj = new();
 ```
 
-## 3. Randomization Methods
+## 17.3. Randomization Methods
 
 SystemVerilog provides several methods for randomizing variables and objects:
 
-### 3.1. `randomize()`
+### 17.3.1. `randomize()`
 
 The `randomize()` method is used to randomize the values of variables or objects based on their associated constraints.
 
@@ -1192,7 +1142,7 @@ data.randomize();
 obj.randomize();
 ```
 
-### 3.2. `with`
+### 17.3.2. `with`
 
 The `with` clause can be used with the `randomize()` method to specify additional constraints or constraints to override the default constraints.
 
@@ -1203,7 +1153,7 @@ data.randomize() with { data > 10; };
 obj.randomize() with { obj.data > 10; };
 ```
 
-## 4. Random Sequences
+## 17.4. Random Sequences
 
 Random sequences in SystemVerilog are sequences of random values generated according to specified constraints. They are useful for generating complex stimulus patterns.
 
@@ -1223,7 +1173,7 @@ randsequence random_sequence;
 endsequence
 ```
 
-## 5. Randomization Functions
+## 17.5. Randomization Functions
 
 SystemVerilog provides built-in functions for randomization, such as `$urandom` and `$urandom_range`, which generate random values uniformly distributed across a specified range.
 
@@ -1237,11 +1187,11 @@ int random_value = $urandom_range(0, 255);
 
 Randomization in SystemVerilog is a valuable tool for generating realistic and comprehensive stimulus for design verification. By randomizing variables, objects, sequences, and using randomization methods and functions, engineers can efficiently explore different scenarios and corner cases, improving the quality and reliability of their designs.
 
-# Constraints in SystemVerilog
+# 18 Constraints in SystemVerilog
 
 Constraints in SystemVerilog are used to restrict the possible values of random variables or objects. They define the range or distribution from which random values can be generated during simulation. Constraints play a crucial role in ensuring that the randomized stimuli generated for testing adhere to the expected behavior of the design.
 
-## 1. Declaring Constraints
+## 18.1. Declaring Constraints
 
 Constraints are declared using the `constraint` keyword within a class or an interface. They specify the conditions or ranges that random variables or objects must satisfy.
 
@@ -1261,7 +1211,7 @@ constraint range_constraint {
 }
 ```
 
-## 2. Constraint Expressions
+## 18.2. Constraint Expressions
 
 Constraint expressions define the conditions or ranges that random values must adhere to. They can include mathematical operations, logical conditions, and relational operators.
 
@@ -1274,7 +1224,7 @@ constraint range_constraint {
 }
 ```
 
-## 3. Applying Constraints
+## 18.3. Applying Constraints
 
 Constraints are associated with random variables or objects using the `constraint` keyword within the class or interface declaration.
 
@@ -1289,7 +1239,7 @@ class MyClass;
 endclass
 ```
 
-## 4. Using Constraints with Randomization
+## 18.4. Using Constraints with Randomization
 
 Constraints are automatically enforced when randomizing variables or objects using the `randomize()` method. Random values generated must satisfy the specified constraints.
 
@@ -1300,7 +1250,7 @@ MyClass obj = new();
 obj.randomize();
 ```
 
-## 5. Advanced Constraint Features
+## 18.5. Advanced Constraint Features
 
 SystemVerilog provides advanced features for constraints, including:
 
@@ -1312,15 +1262,7 @@ SystemVerilog provides advanced features for constraints, including:
 
 Constraints in SystemVerilog are essential for controlling and guiding the randomization process during simulation. By defining the acceptable ranges or conditions for random variables or objects, constraints ensure that the generated stimuli adhere to the desired behavior of the design, facilitating thorough and effective verification.
 
-# Editor (gvim, VSCode)
-
-Editors like GVIM (Graphical VIM) and Visual Studio Code (VSCode) are commonly used for writing and editing SystemVerilog code. They offer features such as syntax highlighting, code completion, and integration with version control systems.
-
-# File Management System (git,SVN)
-
-GitHub and SVN (Subversion) are version control systems used for managing files and source code in collaborative projects. They allow multiple users to work on the same codebase simultaneously, track changes, and revert to previous versions if needed.
-
-# Basic Protocols I2C, SPI, UART, APB
+# 19 Basic Protocols I2C, SPI, UART, APB
 
 These are common serial communication protocols used in digital systems:
 
@@ -1335,3 +1277,46 @@ These are common serial communication protocols used in digital systems:
 
 ## SPI (Serial Peripheral Interface):
 - ** A synchronous serial communication protocol commonly used for communication between microcontrollers and peripheral devices. It uses a master-slave architecture with full-duplex communication.
+
+# 20. What are SystemVerilog/UVM Simulators?
+
+SystemVerilog/UVM simulators are tools used in electronic design automation (EDA) for verifying digital designs. SystemVerilog is a hardware description and verification language that extends Verilog with various features for design and verification. UVM (Universal Verification Methodology) is a standardized methodology for verifying integrated circuit designs using SystemVerilog.
+
+## 20.1. Popular SystemVerilog/UVM Simulators:
+
+   ### 20.1.1. QuestaSim
+   
+   - **Vendor:** Mentor Graphics (A Siemens Business)
+   - **Description:** QuestaSim is a high-performance simulation and debugging tool for both SystemVerilog and UVM-based verification environments. It supports advanced features such as assertion-based verification, coverage-driven verification, and transaction-level modeling.
+   - **Website:** [QuestaSim](https://www.mentor.com/products/fv/questa/)
+   
+   ### 20.1.2. VCS (Verilog Compiler Simulator)
+   
+   - **Vendor:** Synopsys
+   - **Description:** VCS is a widely-used simulation tool that supports SystemVerilog and UVM. It offers high-performance simulation capabilities, including support for advanced verification methodologies and low-power design verification.
+   - **Website:** [VCS](https://www.synopsys.com/verification/simulation/vcs.html)
+   
+   ### 20.1.3. Incisive Enterprise Simulator
+   
+   - **Vendor:** Cadence Design Systems
+   - **Description:** Incisive is a comprehensive verification solution that includes simulation, formal verification, and emulation. It supports SystemVerilog and UVM for verification of complex SoCs (System on Chips) and other digital designs.
+   - **Website:** [Incisive Enterprise Simulator](https://www.cadence.com/en_US/home/tools/system-design-and-verification/simulation-and-testbench-verification/incisive-enterprise-simulator.html)
+   
+## 20.2. Benefits of Using SystemVerilog/UVM Simulators:
+   
+- **Increased Productivity:** Simulators provide fast and efficient verification of digital designs, reducing time-to-market for products.
+- **Advanced Debugging:** Simulators offer powerful debugging features, including waveform viewers, code coverage analysis, and assertion-based debugging.
+- **Compatibility:** SystemVerilog/UVM simulators support industry-standard verification methodologies, ensuring compatibility with existing design and verification environments.
+- **Scalability:** Simulators can scale to handle designs of varying complexities, from small IP blocks to large SoCs.
+
+# 21 Editor (gvim, VSCode)
+
+Editors like GVIM (Graphical VIM) and Visual Studio Code (VSCode) are commonly used for writing and editing SystemVerilog code. They offer features such as syntax highlighting, code completion, and integration with version control systems.
+
+# 22 File Management System (git,SVN)
+
+GitHub and SVN (Subversion) are version control systems used for managing files and source code in collaborative projects. They allow multiple users to work on the same codebase simultaneously, track changes, and revert to previous versions if needed.
+
+# 23 UVM Introduction
+
+The Universal Verification Methodology (UVM) is a standardized methodology for verifying digital designs using SystemVerilog. It provides a set of guidelines, reusable components, and a methodology for creating modular and scalable testbenches.
