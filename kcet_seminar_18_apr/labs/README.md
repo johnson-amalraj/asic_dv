@@ -47,7 +47,7 @@ For inquiries, contact: support@edaplayground.com
   - [Verification Guide SystemVerilog Tutorial](https://verificationguide.com/systemverilog/systemverilog-tutorial/)
   - [ASIC World SystemVerilog Tutorial](https://www.asic-world.com/systemverilog/tutorial.html)
 
-## Directory Structure 
+## Directory Structure (9 directories, 64 files)
 
 ```tree
 .
@@ -124,4 +124,3 @@ For inquiries, contact: support@edaplayground.com
     └── semaphore.sv
 
 ```
-9 directories, 64 files
