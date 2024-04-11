@@ -1,16 +1,27 @@
 # Seminar on VLSI Verification with System Veriolg
 
-## Explanation about System Verilog (https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/agenda.md)
-
-## SystemVerilog Laboratory Exercises
-
 ## Table of Contents
 
+- [Overview on System Verilog](#overview-on-system-verilog)
+- [Simple Testbench explanation with EDA playground](#simple-testbench-explanation-with-eda-playground)
+- [SystemVerilog Laboratory Exercises](#systemVerilog-laboratory-exercises)
 - [List of Experiments](#list-of-experiments)
 - [Course Outcome (for Laboratory)](#course-outcome-for-laboratory)
 - [EDA Playground](#eda-playground)
 - [Resources](#resources)
 - [Directory Structure](#directory-structure)
+
+### Overview on System Verilog 
+
+- https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/agenda.md
+
+### Simple Testbench explanation with EDA playground 
+
+- https://github.com/johnson-amalraj/asic_dv/tree/master/kcet_seminar_18_apr/eda
+
+## SystemVerilog Laboratory Exercises
+
+- https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs
 
 ### List of Experiments
 
