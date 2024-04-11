@@ -1,6 +1,6 @@
 # Seminar on VLSI Verification with System Veriolg
 
-## Explanation about System Verilog (agenda.md)
+## Explanation about System Verilog (https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/agenda.md)
 
 ## SystemVerilog Laboratory Exercises
 
