@@ -49,6 +49,9 @@ module tbench_top;
   
   //enabling the wave dump
   initial begin 
-    $dumpfile("dump.vcd"); $dumpvars;
+    $dumpfile("dump.vcd");
+
+    // Dump variables to waveform dump file
+    $dumpvars(0, mem);
   end
 endmodule
