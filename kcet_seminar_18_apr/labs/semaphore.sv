@@ -10,69 +10,100 @@
 // Developer   : Johnson Amalraj
 // Github Link : https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/semaphore.sv
 // -------------------------------------------------
-// TODO Need fix
 
 //-------------------------------------
 // Design Under Test
 //-------------------------------------
-module semaphore;
+module Semaphore(
+    input logic clk,           // Clock input
+    input logic rst,           // Reset input
+    input logic released,       // Signal to release the semaphore
+    output logic taken         // Output indicating whether the semaphore is taken
+);
+    typedef enum logic [1:0] {
+        IDLE = 2'b00,
+        TAKEN = 2'b01,
+        BUSY = 2'b11
+    } state_t;
 
-  // Define semaphore data structure
-  typedef struct {
-    bit lock;
-  } semaphore_t;
+    state_t state;              // Semaphore state
 
-  // Declare semaphore variable
-  semaphore_t sem;
-
-  // Function to acquire the semaphore
-  function void acquire();
-    while (sem.lock) begin
-      // Wait until the semaphore becomes available
-      // Add any additional waiting mechanism here if needed
+    // Sequential logic for semaphore state machine
+    always_ff @(posedge clk, posedge rst) begin
+        if (rst) 
+            state <= IDLE;      // Reset state to IDLE
+        else if (released)
+            state <= IDLE;      // Release the semaphore
+        else if (state == IDLE)
+            state <= TAKEN;     // Semaphore is taken
+        else if (state == TAKEN)
+            state <= BUSY;      // Semaphore is busy
+        else
+            state <= BUSY;      // Semaphore is busy
     end
-    sem.lock = 1;
-  endfunction
 
-  // Function to release the semaphore
-  function void released();
-    sem.lock = 0;
-  endfunction
+    // Output logic
+    assign taken = (state != IDLE); // Semaphore is taken if state is not IDLE
 endmodule
 
 //-------------------------------------
 // Testbench
 //-------------------------------------
-module testbench;
+module Semaphore_Testbench;
+    logic clk, rst, released;
+    logic taken;
 
-  // Instantiate semaphore
-  semaphore sem_inst;
+    // Instantiate semaphore module
+    Semaphore semaphore_inst (
+        .clk(clk),
+        .rst(rst),
+        .released(released),
+        .taken(taken)
+    );
 
-  // Testbench process to demonstrate semaphore usage
-  initial begin
-    // Acquire semaphore
-    $display("Trying to acquire semaphore...");
-    sem_inst.sem.acquire(); // Corrected syntax to access acquire function
-    $display("Semaphore acquired.");
+    // Clock generation
+    always #5 clk = ~clk;
 
-    // Add some delay to simulate some processing
-    #10;
+    // Initial stimulus
+    initial begin
+        clk = 0;
+        rst = 1;
+        released = 0;
+        #10 rst = 0; // Release reset after 10 time units
 
-    // Release semaphore
-    $display("Releasing semaphore...");
-    sem_inst.sem.released(); // Corrected syntax to access release function
-    $display("Semaphore released.");
+        // Test case 1: Semaphore should be taken initially
+        #20;
+        if (!taken)
+            $display("Test case 1 failed: Semaphore not taken initially");
+        else
+            $display("Test case 1 passed");
+
+        // Test case 2: Release semaphore and check if it's released
+        released = 1;
+        #10 released = 0;
+        #20;
+        if (taken)
+            $display("Test case 2 failed: Semaphore not released");
+        else
+            $display("Test case 2 passed");
+
+        // Add more test cases as needed
+        // ...
+
+        // End simulation
+        #10;
+        $finish;
+    end
+
+
+    // Waveform generation
+    initial begin
+      // Open waveform dump file
+      $dumpfile("waveform.vcd");
         
-    // End simulation
-    $finish;
-  end
+      // Dump variables to waveform dump file
+      $dumpvars();
+    end
 
-  // Waveform generation
-  initial begin
-    // Open waveform dump file
-    $dumpfile("waveform.vcd");
-        
-    // Dump variables to waveform dump file
-    $dumpvars(0, sem_inst);
-  end
 endmodule
+

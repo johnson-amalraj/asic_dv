@@ -33,40 +33,40 @@ module testbench_mux_2x1;
                 .y(y)
   );
 
-  // Stimulus generation
-  initial begin
-    // Test case 1: sel = 0, a = 1, b = 0
-    sel = 0; a = 1; b = 0;
-    #10;
-    $display("Test Case 1: sel = %b, a = %b, b = %b, y = %b", sel, a, b, y);
+    // Stimulus generation
+    initial begin
+      // Test case 1: sel = 0, a = 1, b = 0
+      sel = 0; a = 1; b = 0;
+      #10;
+      $display("Test Case 1: sel = %b, a = %b, b = %b, y = %b", sel, a, b, y);
+          
+      // Test case 2: sel = 1, a = 1, b = 0
+      sel = 1; a = 1; b = 0;
+      #10;
+      $display("Test Case 2: sel = %b, a = %b, b = %b, y = %b", sel, a, b, y);
         
-    // Test case 2: sel = 1, a = 1, b = 0
-    sel = 1; a = 1; b = 0;
-    #10;
-    $display("Test Case 2: sel = %b, a = %b, b = %b, y = %b", sel, a, b, y);
-      
-    // Test case 3: sel = 0, a = 0, b = 1
-    sel = 0; a = 0; b = 1;
-    #10;
-    $display("Test Case 3: sel = %b, a = %b, b = %b, y = %b", sel, a, b, y);
-        
-    // Test case 4: sel = 1, a = 0, b = 1
-    sel = 1; a = 0; b = 1;
-    #10;
-    $display("Test Case 4: sel = %b, a = %b, b = %b, y = %b", sel, a, b, y);
-        
-    // TODO Add more test cases as needed
-        
-    // End simulation
-    $finish;
-  end
+      // Test case 3: sel = 0, a = 0, b = 1
+      sel = 0; a = 0; b = 1;
+      #10;
+      $display("Test Case 3: sel = %b, a = %b, b = %b, y = %b", sel, a, b, y);
+          
+      // Test case 4: sel = 1, a = 0, b = 1
+      sel = 1; a = 0; b = 1;
+      #10;
+      $display("Test Case 4: sel = %b, a = %b, b = %b, y = %b", sel, a, b, y);
+          
+      // TODO Add more test cases as needed
+          
+      // End simulation
+      $finish;
+    end
 
-  // Waveform generation
-  initial begin
-    // Open waveform dump file
-    $dumpfile("waveform.vcd");
-        
-    // Dump variables to waveform dump file
-    $dumpvars(0, mux_2x1);
-  end
+    // Waveform generation
+    initial begin
+      // Open waveform dump file
+      $dumpfile("waveform.vcd");
+          
+      // Dump variables to waveform dump file
+      $dumpvars(0, mux_2x1);
+    end
 endmodule

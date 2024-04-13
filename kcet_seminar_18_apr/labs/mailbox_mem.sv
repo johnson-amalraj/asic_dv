@@ -1,184 +1,102 @@
 // -------------------------------------------------
 // File name   : mailbox_mem.sv
 // Target      : Implementation of a Mailbox by Allocating Memory
-// Description : mailbox_memory is an array of mailbox_entry_t structures, which represents the mailbox.
-//               num_entries keeps track of the number of entries currently in the mailbox.
-//               add_to_mailbox() function adds data to the mailbox if space is available.
-//               get_from_mailbox() function retrieves data from the mailbox if available.
-//               You can instantiate this module in your testbench to simulate mailbox operations. 
-//               Additionally, you can enhance this implementation by adding features like blocking/non-blocking operations, error handling, and more robust memory management, depending on your requirements.
+// Description : Simple Mailbox sceanrio
 // Date        : 07-Apr-2024
 // Developer   : Johnson Amalraj
 // Github Link : https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/mailbox_mem.sv
 // -------------------------------------------------
-// TODO Need fix
 
 //-------------------------------------
 // Design Under Test
 //-------------------------------------
-module mailbox;
-  // Define mailbox size
-  parameter MAILBOX_SIZE = 10;
-
-  // Variable to track the number of entries in the mailbox
-  int num_entries = 0;
-
-  // Define mailbox data structure
-  typedef struct {
-    int data;
-    bit valid;
-  } mailbox_entry_t;
-
-  // Declare memory for mailbox
-  mailbox_entry_t mailbox_memory[];
-
-  // Function to initialize the mailbox
-  function void init_mailbox();
-    mailbox_memory = new[MAILBOX_SIZE];
-  endfunction
-
-  // Function to add data to the mailbox
-  function void add_to_mailbox(int data);
-    if (num_entries < MAILBOX_SIZE) begin
-      mailbox_memory[num_entries].data = data;
-      mailbox_memory[num_entries].valid = 1;
-      num_entries++;
-    end
-    else begin
-      $display("Mailbox is full. Cannot add data.");
-    end
-  endfunction
-
-  // Function to retrieve data from the mailbox
-  function int get_from_mailbox();
-    int data;
-
-    if (num_entries > 0) begin
-      data = mailbox_memory[0].data;
-      // Shift remaining entries in the mailbox
-      for (int i = 0; i < num_entries - 1; i++) begin
-        mailbox_memory[i] = mailbox_memory[i+1];
-      end
-      num_entries--;
-    end
-    else begin
-      $display("Mailbox is empty. No data to retrieve.");
-      data = 0; // Default value
-    end
-        return data;
-    endfunction
-
-endmodule
+// NO DUT Required
 
 //-------------------------------------
 // Testbench
 //-------------------------------------
-module mailbox_tb;
-  // Instantiate mailbox
-  mailbox dut;
+module Producer (
+  output logic write_en,
+  input logic clk,
+  input logic rst,
+  input logic [7:0] data_out
+);
 
-  // Define parameters
-  parameter int DATA_1 = 10;
-  parameter int DATA_2 = 20;
-  parameter int DATA_3 = 30;
+  logic [7:0] data = 8'hAA; // Sample data
 
-    // Initialize mailbox and add data
-    initial begin
-      dut.init_mailbox();
-
-      // Add data to mailbox
-      dut.add_to_mailbox(DATA_1);
-      dut.add_to_mailbox(DATA_2);
-      dut.add_to_mailbox(DATA_3);
-
-      // Retrieve data from mailbox
-      $display("Data retrieved from mailbox: %d", dut.get_from_mailbox());
-      $display("Data retrieved from mailbox: %d", dut.get_from_mailbox());
-      $display("Data retrieved from mailbox: %d", dut.get_from_mailbox());
-
-      // Attempt to retrieve data from empty mailbox
-      $display("Data retrieved from mailbox: %d", dut.get_from_mailbox());
+    always_ff @(posedge clk, posedge rst) begin
+      if (rst)
+        write_en <= 0;
+      else
+        write_en <= 1; // Enable writing data to mailbox
     end
-endmodule
-
-module mailbox;
-    // Define mailbox size
-    parameter MAILBOX_SIZE = 10;
-
-    // Define mailbox data structure
-    typedef struct {
-        int data;
-        bit valid;
-    } mailbox_entry_t;
-
-    // Declare memory for mailbox
-    mailbox_entry_t mailbox_memory[];
-
-    // Variable to track the number of entries in the mailbox
-    int num_entries = 0;
-
-    // Function to initialize the mailbox
-    function void init_mailbox();
-        mailbox_memory = new[MAILBOX_SIZE];
-    endfunction
-
-    // Function to add data to the mailbox
-    function void add_to_mailbox(int data);
-        if (num_entries < MAILBOX_SIZE) begin
-            mailbox_memory[num_entries].data = data;
-            mailbox_memory[num_entries].valid = 1;
-            num_entries++;
-        end
-        else begin
-            $display("Mailbox is full. Cannot add data.");
-        end
-    endfunction
-
-    // Function to retrieve data from the mailbox
-    function int get_from_mailbox();
-        int data;
-        if (num_entries > 0) begin
-            data = mailbox_memory[0].data;
-            // Shift remaining entries in the mailbox
-            for (int i = 0; i < num_entries - 1; i++) begin
-                mailbox_memory[i] = mailbox_memory[i+1];
-            end
-            num_entries--;
-        end
-        else begin
-            $display("Mailbox is empty. No data to retrieve.");
-            data = 0; // Default value
-        end
-        return data;
-    endfunction
 
 endmodule
 
-module testbench;
-    // Instantiate mailbox
-    mailbox dut;
+module Consumer (
+  input logic read_en,
+  output logic clk,
+  input logic rst,
+  output logic [7:0] data_in
+);
 
-    // Define parameters
-    parameter int DATA_1 = 10;
-    parameter int DATA_2 = 20;
-    parameter int DATA_3 = 30;
+  logic [7:0] received_data;
 
-    // Initialize mailbox and add data
+    always_ff @(posedge clk, posedge rst) begin
+      if (rst)
+        clk <= 0;
+      else
+        clk <= ~clk; // Generate a clock signal
+    end
+    always_ff @(posedge clk) begin
+      if (read_en)
+        data_in <= received_data; // Read data from mailbox
+    end
+
+endmodule
+
+module Mailbox (
+    input logic clk,
+    input logic rst,
+    input logic write_en,
+    input logic [7:0] data_in,
+    input logic read_en,
+    output logic [7:0] data_out,
+    output logic full,
+    output logic empty
+);
+
+  localparam MEM_DEPTH = 8;
+  logic [7:0] memory [0:MEM_DEPTH-1];
+  int write_ptr = 0;
+  int read_ptr = 0;
+  
+    always_ff @(posedge clk, posedge rst) begin
+      if (rst) begin
+        write_ptr <= 0;
+        read_ptr <= 0;
+      end
+      else begin
+        if (write_en && !full) begin
+          memory[write_ptr] <= data_in;
+          write_ptr         <= (write_ptr + 1) % MEM_DEPTH;
+        end
+        if (read_en && !empty) begin
+          data_out <= memory[read_ptr];
+          read_ptr <= (read_ptr + 1) % MEM_DEPTH;
+        end
+      end
+    end
+    
+    assign full = ((write_ptr + 1) % MEM_DEPTH == read_ptr);
+    assign empty = (write_ptr == read_ptr);
+
+    // Waveform generation
     initial begin
-        dut = new;
-        dut.init_mailbox();
-
-        // Add data to mailbox
-        dut.add_to_mailbox(DATA_1);
-        dut.add_to_mailbox(DATA_2);
-        dut.add_to_mailbox(DATA_3);
-
-        // Retrieve data from mailbox
-        $display("Data retrieved from mailbox: %d", dut.get_from_mailbox());
-        $display("Data retrieved from mailbox: %d", dut.get_from_mailbox());
-        $display("Data retrieved from mailbox: %d", dut.get_from_mailbox());
-
-        // Attempt to retrieve data from empty mailbox
-        $display("Data retrieved from mailbox: %d", dut.get_from_mailbox());
+      // Open waveform dump file
+      $dumpfile("waveform.vcd");
+          
+      // Dump variables to waveform dump file
+      $dumpvars();
     end
 endmodule
