@@ -1,11 +1,10 @@
 // -------------------------------------------------
 // File name   : mux_2_1.sv
 // Target      : Design a Testbench for 2x1 Mux Using Gates
-// Description : This testbench instantiates the 2x1 mux module and applies different combinations of inputs (a, b, sel) to verify its functionality. 
-//               Adjust the delays (#10) as needed depending on your simulation time unit. You can add more test cases to further validate the design.
 // Date        : 07-Apr-2024
 // Developer   : Johnson Amalraj
 // Github Link : https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/mux_2_1.sv
+// EDA Link    : https://www.edaplayground.com/x/vnnV
 // -------------------------------------------------
 
 //-------------------------------------
@@ -27,10 +26,10 @@ module testbench_mux_2x1;
     
   // Instantiate the 2x1 mux
   mux_2x1 dut (
-                .a(a),
-                .b(b),
-                .sel(sel),
-                .y(y)
+                .a   (a),
+                .b   (b),
+                .sel (sel),
+                .y   (y)
   );
 
     // Stimulus generation
@@ -67,6 +66,6 @@ module testbench_mux_2x1;
       $dumpfile("waveform.vcd");
           
       // Dump variables to waveform dump file
-      $dumpvars(0, mux_2x1);
+      $dumpvars();
     end
 endmodule

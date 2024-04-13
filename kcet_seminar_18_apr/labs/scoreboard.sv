@@ -1,19 +1,18 @@
 // -------------------------------------------------
 // File name   : scoreboard.sv
 // Target      : Implementation of Scoreboard for a Simple DUT
-// Description : A scoreboard is typically used in verification environments to compare the expected outputs from a DUT (Design Under Test) against the actual outputs. 
-//               Below is an example implementation of a scoreboard for a simple DUT in SystemVerilog along with a testbench to demonstrate its usage:
 // Date        : 07-Apr-2024
 // Developer   : Johnson Amalraj
 // Github Link : https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/scoreboard.sv
+// EDA Link    : https://www.edaplayground.com/x/TLda
 // -------------------------------------------------
 
 //-------------------------------------
 // Design Under Test
 //-------------------------------------
 module DUT (
-  input [7:0] a,
-  input [7:0] b,
+  input      [7:0] a,
+  input      [7:0] b,
   output reg [7:0] sum
 );
 
@@ -27,15 +26,15 @@ endmodule
 // Testbench 
 //------------------------------------
 module Scoreboard;
-  reg [7:0] a, b;   // Inputs to DUT
-  reg [7:0] expected_sum;
+  reg  [7:0] a, b; // Inputs to DUT
+  reg  [7:0] expected_sum;
   wire [7:0] actual_sum;
 
     // Instantiate DUT
     DUT dut_instance (
-        .a(a),
-        .b(b),
-        .sum(actual_sum)
+                      .a   (a),
+                      .b   (b),
+                      .sum (actual_sum)
     );
 
     // Generate test vectors
@@ -68,7 +67,7 @@ module Scoreboard;
       $dumpfile("waveform.vcd");
         
       // Dump variables to waveform dump file
-      $dumpvars(0, DUT);
+      $dumpvars();
     end
 
 endmodule
