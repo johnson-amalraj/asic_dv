@@ -19,7 +19,7 @@ module mux_tb_top;
   bit reset;
   
   //clock generation
-  always #5 clk = ~clk;
+  always #1 clk = ~clk;
   
   //reset Generation
   initial begin

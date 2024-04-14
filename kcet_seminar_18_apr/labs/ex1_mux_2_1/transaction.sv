@@ -6,12 +6,12 @@ class transaction;
   rand bit a;
   rand bit b;
   rand bit sel;
-  //     bit y;
+       bit y;
   
   // constaint, to generate any one among write and read
-  constraint valid_sel {
-    sel inside {[0:1]};
-  }
+  // constraint valid_sel {
+  //   sel inside {[0:1]};
+  // }
 
   // constraint y_definition {
   //   y == (sel ? b : a); // Output y depends on the value of sel
