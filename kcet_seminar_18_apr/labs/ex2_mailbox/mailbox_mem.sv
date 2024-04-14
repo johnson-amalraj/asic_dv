@@ -6,7 +6,7 @@
 // Github Link : https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/mailbox_mem.sv
 // EDA Link    : https://www.edaplayground.com/x/YjRS
 // -------------------------------------------------
-// TODO
+// Can use the same program from the mux_2_1
 
 //-------------------------------------
 // Design Under Test
