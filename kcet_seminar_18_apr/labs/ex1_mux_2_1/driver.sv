@@ -40,7 +40,7 @@ class driver;
       transaction trans;
       `DRIV_IF.a   <= 0;
       `DRIV_IF.b   <= 0;
-      `DRIV_IF.y   <= 0;
+      // `DRIV_IF.y   <= 0;
       `DRIV_IF.sel <= 0;
       gen2driv.get(trans);
       $display("--------- [DRIVER-TRANSFER: %0d] ---------",no_transactions);

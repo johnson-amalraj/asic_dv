@@ -2,7 +2,7 @@
 //						
 //-------------------------------------------------------------------------
 `include "environment.sv"
-program test(mem_intf intf);
+program test(mux_intf intf);
   
   class my_trans extends transaction;
     

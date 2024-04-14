@@ -11,7 +11,7 @@ module mux #() (
   ); 
 
   // Declare y as a reg
-  reg [7:0] y;
+  reg y;
   
     always @(posedge clk) begin 
       if (reset == 0) begin
