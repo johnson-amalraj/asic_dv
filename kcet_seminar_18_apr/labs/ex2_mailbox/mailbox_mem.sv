@@ -16,8 +16,6 @@
 //-------------------------------------
 // Testbench
 //-------------------------------------
-// Code your testbench here
-// or browse Examples
 module mailbox;
 
   // Define mailbox parameters
