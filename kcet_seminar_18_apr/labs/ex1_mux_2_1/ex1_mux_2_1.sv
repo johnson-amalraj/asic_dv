@@ -5,6 +5,7 @@
 // Developer   : Johnson Amalraj
 // Github Link : https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/mux_2_1.sv
 // EDA Link    : https://www.edaplayground.com/x/vnnV
+//             : https://www.edaplayground.com/x/p4ND
 // -------------------------------------------------
 
 //-------------------------------------
