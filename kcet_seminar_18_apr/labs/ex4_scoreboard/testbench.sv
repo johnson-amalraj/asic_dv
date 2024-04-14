@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------
-//				www.verificationguide.com   testbench.sv
+//				testbench.sv
 //-------------------------------------------------------------------------
 //tbench_top or testbench top, this is the top most file, in which DUT(Design Under Test) and Verification environment are connected. 
 //-------------------------------------------------------------------------

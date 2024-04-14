@@ -5,6 +5,7 @@
 // Developer   : Johnson Amalraj
 // Github Link : https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs/scoreboard.sv
 // EDA Link    : https://www.edaplayground.com/x/TLda
+//               https://www.edaplayground.com/x/M8zg
 // -------------------------------------------------
 
 //-------------------------------------

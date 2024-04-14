@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------
-//						www.verificationguide.com
+//						
 //-------------------------------------------------------------------------
 //Samples the interface signals, captures into transaction packet and send the packet to scoreboard.
 
