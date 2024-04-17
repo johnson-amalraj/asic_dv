@@ -17,7 +17,6 @@
 
 - [EDA Playground](https://github.com/johnson-amalraj/asic_dv/tree/master/kcet_seminar_18_apr/eda)
 
-
 ### SystemVerilog Laboratory Exercises
 
 - [Github Links](https://github.com/johnson-amalraj/asic_dv/blob/master/kcet_seminar_18_apr/labs)
