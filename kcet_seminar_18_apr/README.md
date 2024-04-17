@@ -58,7 +58,7 @@ For inquiries, contact: support@edaplayground.com
   - [Verification Guide SystemVerilog Tutorial](https://verificationguide.com/systemverilog/systemverilog-tutorial/)
   - [ASIC World SystemVerilog Tutorial](https://www.asic-world.com/systemverilog/tutorial.html)
 
-## Directory Structure (14 directories, 86 files)
+## Directory Structure (14 directories, 87 files)
 
 ```tree
 .
@@ -160,5 +160,6 @@ For inquiries, contact: support@edaplayground.com
 │       ├── testbench.sv
 │       ├── transaction.sv
 │       └── wr_rd_test.sv
+├── tb_structure.png
 └── tree.sv
 ```

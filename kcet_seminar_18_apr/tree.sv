@@ -97,6 +97,7 @@
 │       ├── testbench.sv
 │       ├── transaction.sv
 │       └── wr_rd_test.sv
+├── tb_structure.png
 └── tree.sv
 
-14 directories, 86 files
+14 directories, 87 files
