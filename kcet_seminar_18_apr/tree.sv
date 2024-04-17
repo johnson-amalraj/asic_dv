@@ -15,9 +15,10 @@
 │   └── wr_rd_test.sv
 ├── examples
 │   ├── apb
-│   │   ├── ARM_AMBA3_APB.pdf
 │   │   ├── README.md
 │   │   ├── apb_mem.sv
+│   │   ├── docs
+│   │   │   └── ARM_AMBA3_APB.pdf
 │   │   ├── driver.sv
 │   │   ├── environment.sv
 │   │   ├── generator.sv
@@ -98,4 +99,4 @@
 │       └── wr_rd_test.sv
 └── tree.sv
 
-13 directories, 86 files
+14 directories, 86 files
