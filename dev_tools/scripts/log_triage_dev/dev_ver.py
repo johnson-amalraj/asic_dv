@@ -654,11 +654,17 @@ def show_summary():
     win.title("Summary Table")
     win.geometry("750x400")
     sum_columns = ("Testcase", "TestOpt", "ERROR", "FATAL", "WARNING")
-    sum_tree = ttk.Treeview(win, columns=sum_columns, show="headings")
+    sum_tree = ttk.Treeview(win, columns=sum_columns, show="headings", selectmode="extended")
     for col in sum_columns:
         sum_tree.heading(col, text=col)
         sum_tree.column(col, width=120, anchor="center")
     sum_tree.pack(fill="both", expand=True)
+
+    def on_sum_tree_select(event):
+        selected_items = sum_tree.selection()
+        set_status(f"Selected {len(selected_items)} summary items")
+
+    sum_tree.bind("<<TreeviewSelect>>", on_sum_tree_select)
 
     for (testcase, testopt), counts in summary.items():
         sum_tree.insert("", "end", values=(
