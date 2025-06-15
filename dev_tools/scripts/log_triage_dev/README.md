@@ -1,3 +1,5 @@
+https://github.com/johnson-amalraj/asic_dv/tree/55d8f4d1c559075ebfcd9b7aae6d78642fd7f2c4/dev_tools/scripts/log_triage_dev
+
 ** Open the tool by running below command
   -- LSF   :- bsub -R "rUsage[RAM=10000]" python3 new_ver.py (wrapper script updates required)
   -- Local :- python3 new_ver.py
