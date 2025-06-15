@@ -1,12 +1,18 @@
 ** Open the tool by running below command
-  -- LSF   :- bsub -R rUsage[RAM=10000] python3 dev_ver.py (wrapper script updates required)
-  -- Local :- python3 dev_ver.py
+  -- LSF   :- bsub -R "rUsage[RAM=10000]" python3 new_ver.py (wrapper script updates required)
+  -- Local :- python3 new_ver.py
 
 ** TODO
 
--- Need to fix the issue of selecting Multiple Rows
--- Option to add comments or reviewed
--- Need to load compile.log also
--- Summary is not working for the CENTARUS log path
--- To read the exclusion list and re-apply in the current loaded log path
--- Need to add the infomation how many rows selected
+-- Exclusion
+    --- Need to re-design the GUI for exclusion
+    --- To read the exclusion list and re-apply in the current loaded log path
+-- Comments & Feedback
+    --- Multi user Comments
+    --- If i am exported CSV files, It doesn't have the comemnts column details
+ -- DB
+    --- Once the particular Log folder opnened and Loaded, If i have updated the comments and added the exclusion list, I have to store the all details with all table information as some .txtformat.
+    --- Other users can load the same .txt files in their tool, instead of opening the log file folder to see the already stored information
+
+** Trial ran on below path
+-- /home/data/mpu32_simulation/MUSTANG_ST012_A0/simulation_logs/MUSTANG_ST012_A0_HPP_ISS_RTL7_ECO0/RTL_rtl7_eco0_Regression_05_30_2025/max/
