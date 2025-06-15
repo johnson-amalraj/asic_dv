@@ -9,7 +9,7 @@ from collections import Counter, defaultdict
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QFileDialog, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
     QHBoxLayout, QLineEdit, QLabel, QProgressBar, QMenuBar, QMenu, QAction, QMessageBox,
-    QAbstractItemView, QHeaderView, QStatusBar, QDialog, QPushButton, QInputDialog, QMenu
+    QAbstractItemView, QHeaderView, QStatusBar, QDialog, QPushButton, QInputDialog, QMenu, QSizePolicy, QGridLayout
 )
 from PyQt5.QtCore import Qt, QSettings
 
@@ -119,7 +119,7 @@ def extract_log_info(filepath):
     return (id_val, testcase, testopt)
 
 def group_rows(rows):
-    grouped = defaultdict(lambda: [None, None, set(), None, 0, None, None, None])
+    grouped = defaultdict(lambda: [None, None, set(), None, 0, None, None, None, None])
     for row in rows:
         # Key: (TestCase, Message, Type, LogType, LogFilePath)
         key = (row[1], row[5], row[3], row[6], row[7])
@@ -211,7 +211,7 @@ class SummaryDialog(QDialog):
         for i, row in enumerate(summary_rows):
             for j, val in enumerate(row):
                 self.table.setItem(i, j, QTableWidgetItem(str(val)))
-        self.table.resizeColumnsToContents()
+        # self.table.resizeColumnsToContents()
         layout.addWidget(self.table)
         export_btn = QPushButton("Export Summary to CSV", self)
         export_btn.clicked.connect(self.export_summary)
@@ -242,8 +242,9 @@ class SummaryDialog(QDialog):
 class LogTriageWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.comments_dict = {}  # Maps a unique row key to the comment
         self.setWindowTitle("Log Triage v1.0 (PyQt5)")
-        self.columns = ["ID", "TestCase", "TestOption", "Type", "Count", "Message", "LogType", "LogFilePath"]
+        self.columns = ["ID", "TestCase", "TestOption", "Type", "Count", "Message", "LogType", "LogFilePath", "Comments"]
         self.settings = QSettings("LogTriage", "LogTriageApp")
         self.all_rows = []
         self.filtered_rows = []
@@ -252,26 +253,16 @@ class LogTriageWindow(QMainWindow):
         self.show_simulate = True
         self.show_compile = True
         self.show_scoreboard = True
-        self.logfile_column_visible = False
+        self.logfile_column_visible = True 
         self.init_ui()
         self.restore_settings()
         self.exclusion_list = set()
 
     def init_ui(self):
+        default_colwidths = [80, 250, 300, 70, 60, 400, 80, 400]
         central = QWidget()
         vbox = QVBoxLayout(central)
         self.setCentralWidget(central)
-
-        # Filter row
-        filter_hbox = QHBoxLayout()
-        self.filter_edits = []
-        for col in self.columns:
-            edit = QLineEdit()
-            edit.setPlaceholderText(f"Filter {col}")
-            edit.textChanged.connect(self.apply_filters)
-            self.filter_edits.append(edit)
-            filter_hbox.addWidget(edit)
-        vbox.addLayout(filter_hbox)
 
         # Table
         self.table = QTableWidget(0, len(self.columns))
@@ -280,19 +271,39 @@ class LogTriageWindow(QMainWindow):
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.table.setSortingEnabled(True)
-        self.table.doubleClicked.connect(self.open_log_file)
+        self.table.doubleClicked.connect(self.handle_table_double_click)
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.show_context_menu)
-        self.table.horizontalHeader().sectionResized.connect(self.save_col_widths)
         self.table.horizontalHeader().sectionClicked.connect(self.handle_header_click)
+        self.table.horizontalHeader().sectionResized.connect(self.update_filter_row_geometry)
+        self.table.horizontalScrollBar().valueChanged.connect(self.update_filter_row_geometry)
+        self.table.horizontalHeader().sectionMoved.connect(self.update_filter_row_geometry)
+        self.table.verticalScrollBar().valueChanged.connect(self.update_filter_row_geometry)
+        self.table.viewport().installEventFilter(self)
+        self.table.itemChanged.connect(self.handle_comment_edit)
+
+        # --- Filter row widget (floating, below header) ---
+        self.filter_row_widget = QWidget()
+        self.filter_row_widget.setStyleSheet("background: #f8f8f8; border-bottom: 1px solid #ccc;")
+        filter_layout = QHBoxLayout(self.filter_row_widget)
+        filter_layout.setContentsMargins(0, 0, 0, 0)
+        self.filter_edits = []
+        for i, col in enumerate(self.columns):
+            edit = QLineEdit()
+            edit.setPlaceholderText(f"Filter {col}")
+            edit.textChanged.connect(self.apply_filters)
+            filter_layout.addWidget(edit)
+            self.filter_edits.append(edit)
+
+        # Add filter row and table to layout (filter row first)
+        vbox.addWidget(self.filter_row_widget)
         vbox.addWidget(self.table)
 
         # Set default column widths
-        default_colwidths = [80, 180, 120, 70, 60, 300, 80, 300]
         for i, w in enumerate(default_colwidths):
             self.table.setColumnWidth(i, w)
         self.table.horizontalHeader().setStretchLastSection(False)
-        self.table.setColumnHidden(7, not self.logfile_column_visible)
+        self.table.setColumnHidden(7, False)
 
         # Folder path label (above progress bar)
         self.folder_status_label = QLabel("")
@@ -324,11 +335,6 @@ class LogTriageWindow(QMainWindow):
         self.excl_action.triggered.connect(self.add_to_exclusion)
         self.addAction(self.excl_action)
 
-        self.open_action = QAction("Open Log File", self)
-        self.open_action.setShortcut("Ctrl+O")
-        self.open_action.triggered.connect(self.open_selected_log_file)
-        self.addAction(self.open_action)
-
         self.find_action = QAction("Find", self)
         self.find_action.setShortcut("Ctrl+F")
         self.find_action.triggered.connect(self.show_find_dialog)
@@ -358,6 +364,11 @@ class LogTriageWindow(QMainWindow):
             for i, w in enumerate(widths):
                 self.table.setColumnWidth(i, int(w))
 
+    def eventFilter(self, obj, event):
+        if obj == self.table.viewport() and event.type() == event.Resize:
+            self.update_filter_row_geometry()
+        return super().eventFilter(obj, event)
+
     def save_settings(self):
         self.save_col_widths()
         self.settings.setValue(WIN_SIZE_KEY, self.size())
@@ -376,6 +387,53 @@ class LogTriageWindow(QMainWindow):
     def closeEvent(self, event):
         self.save_settings()
         super().closeEvent(event)
+
+    def reset_filters(self):
+        for edit in self.filter_edits:
+            edit.clear()
+
+    def update_filter_row_geometry(self):
+        header = self.table.horizontalHeader()
+        y = header.height() - 1  # Just below the header
+        self.filter_row_widget.move(0, y)
+        # Set width and position of each filter box to match column
+        for i, edit in enumerate(self.filter_edits):
+            x = self.table.columnViewportPosition(i)
+            w = self.table.columnWidth(i)
+            edit.setGeometry(x, 0, w, self.filter_row_widget.height())
+        # Set the filter row widget width to match the table viewport
+        self.filter_row_widget.setFixedWidth(self.table.viewport().width())
+
+    def handle_comment_edit(self, item):
+        if item.column() == len(self.columns) - 1:  # Comments column
+            # Get the row's unique key (excluding Comments)
+            row_data = []
+            for col in range(len(self.columns) - 1):
+                cell = self.table.item(item.row(), col)
+                row_data.append(cell.text() if cell else "")
+            row_key = tuple(row_data)
+            self.comments_dict[row_key] = item.text()
+
+    def get_message_stats(self):
+        """
+        Returns a dict with total and unique counts for ERROR, FATAL, WARNING.
+        """
+        stats = {
+            "ERROR": {"total": 0, "unique": set()},
+            "FATAL": {"total": 0, "unique": set()},
+            "WARNING": {"total": 0, "unique": set()},
+        }
+        for row in self.filtered_rows:
+            typ = row[3]
+            count = int(row[4])
+            msg = row[5]
+            if typ in stats:
+                stats[typ]["total"] += count
+                stats[typ]["unique"].add(msg)
+        # Convert sets to counts
+        for typ in stats:
+            stats[typ]["unique"] = len(stats[typ]["unique"])
+        return stats
 
     # --- Menus ---
     def init_menus(self):
@@ -414,11 +472,6 @@ class LogTriageWindow(QMainWindow):
         copy_row_action.setShortcut("Ctrl+C")
         copy_row_action.triggered.connect(self.copy_selected_rows)
         edit_menu.addAction(copy_row_action)
-
-        open_row_action = QAction("Open Log File", self)
-        open_row_action.setShortcut("Ctrl+O")
-        open_row_action.triggered.connect(self.open_selected_log_file)
-        edit_menu.addAction(open_row_action)
 
         find_action = QAction("Find", self)
         find_action.setShortcut("Ctrl+F")
@@ -472,13 +525,6 @@ class LogTriageWindow(QMainWindow):
         self.scoreboard_action.setShortcut("Ctrl+3")
         self.scoreboard_action.triggered.connect(self.toggle_scoreboard)
         log_menu.addAction(self.scoreboard_action)
-
-        log_menu.addSeparator()
-        self.logfilecol_action = QAction("Show LogFile Column", self, checkable=True)
-        self.logfilecol_action.setChecked(self.logfile_column_visible)
-        self.logfilecol_action.setShortcut("Ctrl+Shift+L")
-        self.logfilecol_action.triggered.connect(self.toggle_logfile_column)
-        log_menu.addAction(self.logfilecol_action)
 
         # Summary menu
         summary_menu = self.menu.addMenu("&Summary")
@@ -612,25 +658,39 @@ class LogTriageWindow(QMainWindow):
                 continue
             self.filtered_rows.append(row)
         self.update_table()
-        self.statusbar.showMessage(f"Showing {len(self.filtered_rows)} rows (filtered)")
+        stats = self.get_message_stats()
+        self.statusbar.showMessage(
+            f"Showing {len(self.filtered_rows)} rows | "
+            f"ERROR: {stats['ERROR']['total']} ({stats['ERROR']['unique']} unique), "
+            f"FATAL: {stats['FATAL']['total']} ({stats['FATAL']['unique']} unique), "
+            f"WARNING: {stats['WARNING']['total']} ({stats['WARNING']['unique']} unique)"
+        )
+        self.update_filter_row_geometry()
 
     def update_table(self):
         self.table.setSortingEnabled(False)  # Disable sorting while populating
         self.table.setRowCount(len(self.filtered_rows))
         for i, row in enumerate(self.filtered_rows):
             for j, val in enumerate(row):
-                item = QTableWidgetItem(str(val))
-                if row[3] == "ERROR":
-                    item.setForeground(Qt.red)
-                elif row[3] == "FATAL":
-                    item.setForeground(Qt.magenta)
-                elif row[3] == "WARNING":
-                    item.setForeground(Qt.darkYellow)
-                if j == 5:
-                    item.setToolTip(str(val))
+                if j == len(self.columns) - 1:  # Comments column
+                    # Get unique key for this row (excluding Comments)
+                    row_key = tuple(row[:-1])
+                    comment = self.comments_dict.get(row_key, "")
+                    item = QTableWidgetItem(comment)
+                    item.setFlags(item.flags() | Qt.ItemIsEditable)
+                else:
+                    item = QTableWidgetItem(str(val))
+                    if row[3] == "ERROR":
+                        item.setForeground(Qt.red)
+                    elif row[3] == "FATAL":
+                        item.setForeground(Qt.magenta)
+                    elif row[3] == "WARNING":
+                        item.setForeground(Qt.darkYellow)
+                    if j == 5:
+                        item.setToolTip(str(val))
                 self.table.setItem(i, j, item)
-        self.table.resizeColumnsToContents()
-        self.table.setColumnHidden(7, not self.logfile_column_visible)
+        # self.table.resizeColumnsToContents()
+        self.table.setColumnHidden(7, False)
         self.table.setSortingEnabled(True)  # Re-enable sorting after populating
         if self.sort_order:
             self.sort_table_multi()
@@ -640,12 +700,8 @@ class LogTriageWindow(QMainWindow):
         if not path:
             return
         try:
-            # Clear the current exclusion list
-            self.exclusion_list.clear()
-            # Load new exclusion list from file
             with open(path, "r", encoding="utf-8") as f:
                 self.exclusion_list = set(line.strip() for line in f if line.strip())
-            # Re-apply exclusion to current data
             self.apply_filters()
             self.statusbar.showMessage(f"Exclusion list imported from {path} and applied to current data.")
         except Exception as e:
@@ -684,15 +740,17 @@ class LogTriageWindow(QMainWindow):
                 if j == 5:
                     item.setToolTip(str(val))
                 self.table.setItem(i, j, item)
-        self.table.resizeColumnsToContents()
-        self.table.setColumnHidden(7, not self.logfile_column_visible)
+        # self.table.resizeColumnsToContents()
+        self.table.setColumnHidden(7, False)
+        self.update_filter_row_geometry()
+
 
     # --- Export ---
     def export_to_csv(self):
         if not self.filtered_rows:
             QMessageBox.warning(self, "Export", "No data to export.")
             return
-        path, _ = QInputDialog.getText(self, "Export to CSV", "CSV File Path:")
+        path, _ = QFileDialog.getSaveFileName(self, "Export to CSV", os.getcwd(), "CSV Files (*.csv)")
         if not path or not path.strip():
             return
         path = path.strip()
@@ -701,7 +759,9 @@ class LogTriageWindow(QMainWindow):
                 writer = csv.writer(f)
                 writer.writerow(self.columns)
                 for row in self.filtered_rows:
-                    writer.writerow(row)
+                    row_key = tuple(row[:-1])
+                    comment = self.comments_dict.get(row_key, "")
+                    writer.writerow(list(row[:-1]) + [comment])
             self.statusbar.showMessage(f"Exported {len(self.filtered_rows)} rows to {path}")
         except Exception as e:
             self.statusbar.showMessage(f"Failed to export: {e}")
@@ -758,17 +818,24 @@ class LogTriageWindow(QMainWindow):
     # --- Summary ---
     def show_summary(self):
         summary = defaultdict(lambda: {"ERROR":0, "FATAL":0, "WARNING":0})
+        unique_msgs = defaultdict(lambda: {"ERROR": set(), "FATAL": set(), "WARNING": set()})
         for row in self.filtered_rows:
             testcase = row[1]
             testopt = row[2]
             typ = row[3]
             count = int(row[4])
+            msg = row[5]
             summary[(testcase, testopt)][typ] += count
+            unique_msgs[(testcase, testopt)][typ].add(msg)
         summary_rows = []
         for (testcase, testopt), counts in summary.items():
             summary_rows.append([
-                testcase, testopt, counts["ERROR"], counts["FATAL"], counts["WARNING"]
+                testcase, testopt,
+                counts["ERROR"], len(unique_msgs[(testcase, testopt)]["ERROR"]),
+                counts["FATAL"], len(unique_msgs[(testcase, testopt)]["FATAL"]),
+                counts["WARNING"], len(unique_msgs[(testcase, testopt)]["WARNING"]),
             ])
+        # Update SummaryDialog to accept and display these columns
         dlg = SummaryDialog(summary_rows, self, statusbar=self.statusbar)
         dlg.exec_()
 
@@ -781,9 +848,6 @@ class LogTriageWindow(QMainWindow):
         excl_action = QAction("Add to Exclusion (Ctrl+X)", self)
         excl_action.triggered.connect(self.add_to_exclusion)
         menu.addAction(excl_action)
-        open_action = QAction("Open Log File (Ctrl+O)", self)
-        open_action.triggered.connect(self.open_selected_log_file)
-        menu.addAction(open_action)
         menu.exec_(self.table.viewport().mapToGlobal(pos))
 
     def show_shortcuts(self):
@@ -808,7 +872,6 @@ class LogTriageWindow(QMainWindow):
             "  Ctrl+1: Show simulate.log\n"
             "  Ctrl+2: Show compile.log\n"
             "  Ctrl+3: Show Scoreboard Errors\n"
-            "  Ctrl+Shift+L: Show LogFile Column\n"
             "\n"
             "Summary Menu:\n"
             "  Ctrl+S: Show Summary\n"
@@ -850,17 +913,6 @@ class LogTriageWindow(QMainWindow):
         QApplication.clipboard().setText(text)
         self.statusbar.showMessage("Copied selected row(s) to clipboard.")
 
-    def open_selected_log_file(self):
-        selected = self.table.selectedItems()
-        if not selected:
-            return
-        row = selected[0].row()
-        filepath = self.table.item(row, 7).text()
-        if os.path.isfile(filepath):
-            os.system(f"xdg-open '{filepath}'")
-        else:
-            QMessageBox.warning(self, "Open Log File", f"File not found:\n{filepath}")
-
     def open_log_file(self, index):
         row = index.row()
         filepath = self.table.item(row, 7).text()
@@ -868,6 +920,14 @@ class LogTriageWindow(QMainWindow):
             os.system(f"gvim '{filepath}' &")
         else:
             QMessageBox.warning(self, "Open Log File", f"File not found:\n{filepath}")
+
+    def handle_table_double_click(self, index):
+        # Only open the log file if a non-Comments column is double-clicked
+        if index.column() == len(self.columns) - 1:  # Comments column
+            # Let QTableWidget handle editing (do nothing here)
+            return
+        else:
+            self.open_log_file(index)
 
     # --- Log menu actions ---
     def toggle_simulate(self):
@@ -881,10 +941,6 @@ class LogTriageWindow(QMainWindow):
     def toggle_scoreboard(self):
         self.show_scoreboard = self.scoreboard_action.isChecked()
         self.apply_filters()
-
-    def toggle_logfile_column(self):
-        self.logfile_column_visible = self.logfilecol_action.isChecked()
-        self.table.setColumnHidden(7, not self.logfile_column_visible)
 
     # --- Find dialog ---
     def show_find_dialog(self):
@@ -913,3 +969,4 @@ if __name__ == "__main__":
     win = LogTriageWindow()
     win.show()
     sys.exit(app.exec_())
+
