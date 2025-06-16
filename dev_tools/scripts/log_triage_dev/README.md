@@ -30,12 +30,13 @@ Redesign the GUI for managing exclusions.
 Enable reading and reapplying exclusion lists to the currently loaded log path.
 
 ## Comments & Feedback
-Need to remove the login window.
-Instead of the multi user comments, Just i want to store the comments, whoever enters.
-Example:
-If I opened the log folder/older saved session, I entered the comments, and saved the session.
-Others can able to open the session, and add their comments in new line without overriding my comments (they able to see my comments), 
-then they can able to save the session. so anyone can able to add comemtns without overriding the existing comments, and save the session with updated comments
+- Need to remove the login window.
+- Instead of the multi user comments, Just i want to store the comments, whoever enters.
+
+#### Example:
+- If I opened the log folder/older saved session, I entered the comments, and saved the session.
+- Others can able to open the session, and add their comments in new line without overriding my comments (they able to see my comments), 
+- then they can able to save the session. so anyone can able to add comemtns without overriding the existing comments, and save the session with updated comments
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------
 
