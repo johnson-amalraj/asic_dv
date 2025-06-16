@@ -2,6 +2,8 @@
 
 This tool is designed to assist in triaging and analyzing simulation log files efficiently. It supports multi-user collaboration, exclusion management, and session persistence.
 
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+
 # Github Path
 
 https://github.com/johnson-amalraj/asic_dv/tree/55d8f4d1c559075ebfcd9b7aae6d78642fd7f2c4/dev_tools/scripts/log_triage_dev
@@ -10,11 +12,9 @@ https://github.com/johnson-amalraj/asic_dv/tree/55d8f4d1c559075ebfcd9b7aae6d7864
 
 #  How to Run
 
-## On LSF:
-bsub -R "rUsage[RAM=10000]" python3 new_ver.py
+On LSF: bsub -R "rUsage[RAM=10000]" python3 new_ver.py
 
-## On Local :
-python3 new_ver.py
+On Local : python3 new_ver.py
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -30,8 +30,12 @@ Redesign the GUI for managing exclusions.
 Enable reading and reapplying exclusion lists to the currently loaded log path.
 
 ## Comments & Feedback
-Support multi-user comments.
-Ensure exported CSV files include the comments column.
+Need to remove the login window.
+Instead of the multi user comments, Just i want to store the comments, whoever enters.
+Example:
+If I opened the log folder/older saved session, I entered the comments, and saved the session.
+Others can able to open the session, and add their comments in new line without overriding my comments (they able to see my comments), 
+then they can able to save the session. so anyone can able to add comemtns without overriding the existing comments, and save the session with updated comments
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -46,19 +50,35 @@ Persistence: Remembers window size, position, column widths, recent folders, and
 Error Handling: Logs uncaught exceptions and shows user-friendly error dialogs.
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------
-
-# Suggestions for Improvement
   
+# Feature Ideas to Consider
+
 ## Visualization:
 Add basic charts (e.g., pie chart of error types, timeline of log events).
 Heatmap of error frequency over time or modules.
-  
-## Feature Ideas to Consider
-Tagging System: Allow users to tag log entries for categorization.
-Auto-Triage Suggestions: Use simple heuristics or ML to suggest likely causes or group similar issues.
-Integration Hooks: Allow integration with bug tracking tools (e.g., JIRA) or CI/CD pipelines.
-Dark Mode: For better readability during long debugging sessions.
-Command Line Interface (CLI): For users who prefer scripting or automation.
-Column Visibility: Allow users to hide/show columns (e.g., log file path).
-Advanced Filtering: Support AND/OR logic in filters, or allow users to save filter presets.
-Log File Preview: On double-click, show a preview of the log message in a dialog, with context lines.
+
+## Tagging System: 
+Allow users to tag log entries for categorization.
+
+## Auto-Triage Suggestions: 
+Use simple heuristics or ML to suggest likely causes or group similar issues.
+
+## Integration Hooks: 
+Allow integration with bug tracking tools (e.g., JIRA) or CI/CD pipelines.
+
+## Dark Mode: 
+For better readability during long debugging sessions.
+
+## Command Line Interface (CLI): 
+For users who prefer scripting or automation.
+
+## Column Visibility: 
+Allow users to hide/show columns (e.g., log file path).
+
+## Advanced Filtering: 
+Support AND/OR logic in filters, or allow users to save filter presets.
+
+## Log File Preview: 
+On double-click, show a preview of the log message in a dialog, with context lines.
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------
