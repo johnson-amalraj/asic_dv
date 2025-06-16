@@ -39,15 +39,31 @@ then they can able to save the session. so anyone can able to add comemtns witho
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# Features
-Filtering: Per-column, including numeric range for "Count".
-Sorting: Multi-column sorting with Shift+Click.
-Exclusion: Add/view/export/import/clear exclusion list.
-Summary: Aggregates error/warning/fatal counts per testcase/option.
-Export: Filtered data and summary can be exported to CSV.
-Find: Regex and plain text search with highlighting.
-Persistence: Remembers window size, position, column widths, recent folders, and exclusions.
-Error Handling: Logs uncaught exceptions and shows user-friendly error dialogs.
+# Features TODO
+
+## Filtering: 
+Per-column, including numeric range for "Count".
+
+## Sorting: 
+Multi-column sorting with Shift+Click.
+
+## Exclusion: 
+Add/view/export/import/clear exclusion list.
+
+## Summary: 
+Aggregates error/warning/fatal counts per testcase/option.
+
+## Export: 
+Filtered data and summary can be exported to CSV.
+
+## Find: 
+Regex and plain text search with highlighting.
+
+## Persistence: 
+Remembers window size, position, column widths, recent folders, and exclusions.
+
+## Error Handling: 
+Logs uncaught exceptions and shows user-friendly error dialogs.
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------
   
