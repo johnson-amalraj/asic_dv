@@ -267,8 +267,9 @@ class SummaryDialog(QDialog):
 class LogTriageWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.comments_dict = {}  # Maps a unique row key to the comment
-        self.setWindowTitle("Log Triage v1.0 (PyQt5)")
+        self.current_user = self.prompt_for_user()
+        self.comments_dict = {}  # {(row_key, username): comment}
+        self.setWindowTitle("Log Triage v2.0 (PyQt5)")
         self.columns = ["ID", "Test Case", "Test Option", "Type", "Count", "Message", "Log Type", "Log File Path", "Comments"]
         self.settings = QSettings("LogTriage", "LogTriageApp")
         self.all_rows = []
@@ -282,6 +283,22 @@ class LogTriageWindow(QMainWindow):
         self.init_ui()
         self.restore_settings()
         self.exclusion_list = set()
+
+    def prompt_for_user(self):
+        user, ok = QInputDialog.getText(self, "User Login", "Enter your username:")
+        if not ok or not user.strip():
+            user = "default"
+        return user.strip()
+
+    def handle_comment_edit(self, item):
+        comments_col = self.columns.index("Comments")
+        if item.column() == comments_col:
+            row_data = [] # Get the row's unique key (excluding Comments)
+            for col in range(len(self.columns) - 1):
+                cell = self.table.item(item.row(), col)
+                row_data.append(cell.text() if cell else "")
+            row_key = tuple(row_data)
+            self.comments_dict[(row_key, self.current_user)] = item.text()
 
     def init_ui(self):
         default_colwidths = [100, 250, 300, 200, 80, 400, 80, 500, 100]
@@ -605,7 +622,18 @@ class LogTriageWindow(QMainWindow):
 
     # --- Log Loading ---
     def load_log_folder(self, folder=None):
-        # ... (existing code to get folder)
+        if not folder:
+            last_folder = self.settings.value("lastFolder", "")
+            folder = QFileDialog.getExistingDirectory(self, "Select Log Folder", last_folder or "")
+            if not folder:
+                return
+            folder = folder.strip()
+        if not os.path.isdir(folder):
+            QMessageBox.warning(self, "Invalid Path", f"The path '{folder}' is not a valid directory.")
+            return
+        self.loaded_folder = folder
+        self.settings.setValue(LAST_FOLDER_KEY, folder)
+        QApplication.processEvents()
         # Find log files
         log_files = []
         for root, dirs, files in os.walk(folder):
@@ -691,9 +719,8 @@ class LogTriageWindow(QMainWindow):
         for i, row in enumerate(self.filtered_rows):
             for j, val in enumerate(row):
                 if j == len(self.columns) - 1:  # Comments column
-                    # Get unique key for this row (excluding Comments)
-                    row_key = tuple(row[:-1])
-                    comment = self.comments_dict.get(row_key, "")
+                    row_key = tuple(row[:-1]) # Get unique key for this row (excluding Comments)
+                    comment = self.comments_dict.get((row_key, self.current_user), "")
                     item = QTableWidgetItem(comment)
                     item.setFlags(item.flags() | Qt.ItemIsEditable)
                 else:
@@ -706,6 +733,7 @@ class LogTriageWindow(QMainWindow):
                         item.setForeground(Qt.darkYellow)
                     if j == 5:
                         item.setToolTip(str(val))
+                    pass
                 self.table.setItem(i, j, item)
         # self.table.resizeColumnsToContents()
         self.table.setColumnHidden(7, False)
@@ -715,6 +743,8 @@ class LogTriageWindow(QMainWindow):
 
     # --- Multi-column sorting ---
     def handle_header_click(self, logicalIndex):
+        if logicalIndex >= len(self.columns):
+            return
         modifiers = QApplication.keyboardModifiers()
         if modifiers == Qt.ShiftModifier:
             if logicalIndex in self.sort_order:
@@ -727,8 +757,12 @@ class LogTriageWindow(QMainWindow):
     def sort_table_multi(self):
         if not self.sort_order:
             return
+        # Only use valid indices
+        valid_sort_order = [i for i in self.sort_order if i < len(self.columns)]
+        if not valid_sort_order:
+            return
         def sort_key(row):
-            return tuple(row[i] for i in self.sort_order)
+            return tuple(row[i] for i in valid_sort_order)
         self.filtered_rows.sort(key=sort_key)
         self.update_table_no_sort()
 
@@ -760,13 +794,18 @@ class LogTriageWindow(QMainWindow):
             return
         path = path.strip()
         try:
+            # Find all users
+            users = set(u for (_, u) in self.comments_dict.keys())
+            user_list = sorted(users)
+            # Add user comment columns
+            export_columns = self.columns[:-1] + [f"Comment ({u})" for u in user_list]
             with open(path, "w", newline='', encoding="utf-8") as f:
                 writer = csv.writer(f)
-                writer.writerow(self.columns)
+                writer.writerow(export_columns)
                 for row in self.filtered_rows:
                     row_key = tuple(row[:-1])
-                    comment = self.comments_dict.get(row_key, "")
-                    writer.writerow(list(row[:-1]) + [comment])
+                    comments = [self.comments_dict.get((row_key, u), "") for u in user_list]
+                    writer.writerow(list(row[:-1]) + comments)
             self.statusbar.showMessage(f"Exported {len(self.filtered_rows)} rows to {path}")
         except Exception as e:
             self.statusbar.showMessage(f"Failed to export: {e}")
@@ -853,7 +892,24 @@ class LogTriageWindow(QMainWindow):
         excl_action = QAction("Add to Exclusion (Ctrl+X)", self)
         excl_action.triggered.connect(self.add_to_exclusion)
         menu.addAction(excl_action)
+        # Add the new action here
+        show_all_comments_action = QAction("Show All Comments", self)
+        show_all_comments_action.triggered.connect(self.show_all_comments_for_selected_row)
+        menu.addAction(show_all_comments_action)
         menu.exec_(self.table.viewport().mapToGlobal(pos))
+
+    def show_all_comments_for_selected_row(self):
+        selected = self.table.selectedItems()
+        if not selected:
+            return
+        row = selected[0].row()
+        row_key = tuple(self.table.item(row, col).text() for col in range(len(self.columns) - 1))
+        comments = []
+        for (rk, user), comment in self.comments_dict.items():
+            if rk == row_key and comment.strip():
+                comments.append(f"{user}: {comment}")
+        msg = "\n".join(comments) if comments else "(No comments)"
+        QMessageBox.information(self, "All Comments", msg)
 
     def show_shortcuts(self):
         QMessageBox.information(self, "Shortcut Keys",
@@ -948,6 +1004,18 @@ class LogTriageWindow(QMainWindow):
         self.apply_filters()
 
     def save_session(self):
+        # --- Fix: Commit any in-progress edits ---
+        comments_col = self.columns.index("Comments")
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, comments_col)
+            if item is not None:
+                self.table.closePersistentEditor(item)
+        self.table.clearFocus()
+        QApplication.processEvents()
+    
+        # --- Fix: Update comments_dict from table ---
+        self.update_comments_dict_from_table()
+    
         path, _ = QFileDialog.getSaveFileName(self, "Save Session", os.getcwd(), "Text Files (*.txt)")
         if not path:
             return
@@ -957,16 +1025,29 @@ class LogTriageWindow(QMainWindow):
                 f.write("[ROWS]\n")
                 writer = csv.writer(f)
                 writer.writerow(self.columns)
-                for row in self.all_rows:
-                    row_key = tuple(row[:-1])
-                    comment = self.comments_dict.get(row_key, "")
-                    writer.writerow(list(row[:-1]) + [comment])
-                f.write("[EXCLUSIONS]\n")
-                for msg in sorted(self.exclusion_list):
-                    f.write(msg + "\n")
+                for row in self.filtered_rows:
+                    writer.writerow(row)
+                f.write("[COMMENTS]\n")
+                for key, comment in self.comments_dict.items():
+                    if not (isinstance(key, tuple) and len(key) == 2):
+                        continue  # skip malformed keys
+                    row_key, username = key
+                    f.write(",".join(row_key) + f",{username},{comment}\n")
             self.statusbar.showMessage(f"Session saved to {path}")
         except Exception as e:
             QMessageBox.critical(self, "Save Session Error", f"Failed to save session:\n{e}")
+
+    def update_comments_dict_from_table(self):
+        comments_col = self.columns.index("Comments")
+        for row in range(self.table.rowCount()):
+            row_data = []
+            for col in range(len(self.columns) - 1):
+                cell = self.table.item(row, col)
+                row_data.append(cell.text() if cell else "")
+            row_key = tuple(row_data)
+            comment_item = self.table.item(row, comments_col)
+            comment = comment_item.text() if comment_item else ""
+            self.comments_dict[(row_key, self.current_user)] = comment
 
     def load_session(self):
         path, _ = QFileDialog.getOpenFileName(self, "Load Session", os.getcwd(), "Text Files (*.txt)")
@@ -975,44 +1056,47 @@ class LogTriageWindow(QMainWindow):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 lines = f.readlines()
-            # Parse sections
-            rows_section = False
-            exclusions_section = False
+    
+            section = None
             rows = []
             comments_dict = {}
             exclusion_list = set()
-            reader = None
+            header = []
             for line in lines:
                 line = line.rstrip("\n")
-                if line.startswith("#"):
+                if not line or line.startswith("#"):
                     continue
                 if line == "[ROWS]":
-                    rows_section = True
-                    exclusions_section = False
+                    section = "ROWS"
                     continue
-                if line == "[EXCLUSIONS]":
-                    exclusions_section = True
-                    rows_section = False
+                elif line == "[COMMENTS]":
+                    section = "COMMENTS"
                     continue
-                if rows_section:
-                    if reader is None:
-                        # Header line
+                elif line == "[EXCLUSIONS]":
+                    section = "EXCLUSIONS"
+                    continue
+    
+                if section == "ROWS":
+                    if not header:
                         header = next(csv.reader([line]))
-                        reader = []
                         continue
-                    else:
-                        row = next(csv.reader([line]))
-                        # row: [ID, Test Case, Test Option, Type, Count, Message, Log Type, Log File Path, Comments]
-                        comments = row[-1]
-                        row_data = row[:-1]
-                        rows.append(row_data + [comments])
-                        row_key = tuple(row_data)
-                        comments_dict[row_key] = comments
-                elif exclusions_section:
+                    row = next(csv.reader([line]))
+                    rows.append(row)
+                elif section == "COMMENTS":
+                    # row_key fields, username, comment
+                    parts = line.split(",")
+                    if len(parts) < len(self.columns):
+                        continue  # skip malformed
+                    row_key = tuple(parts[:len(self.columns)-1])
+                    username = parts[len(self.columns)-1]
+                    comment = ",".join(parts[len(self.columns):])
+                    comments_dict[(row_key, username)] = comment
+                elif section == "EXCLUSIONS":
                     if line.strip():
                         exclusion_list.add(line.strip())
+    
             # Restore state
-            self.all_rows = [row[:-1] for row in rows]  # Remove comments for all_rows
+            self.all_rows = rows  # Keep the comments column
             self.comments_dict = comments_dict
             self.exclusion_list = exclusion_list
             self.filtered_rows = self.all_rows.copy()
