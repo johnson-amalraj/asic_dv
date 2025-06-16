@@ -33,47 +33,21 @@ Enable reading and reapplying exclusion lists to the currently loaded log path.
 Support multi-user comments.
 Ensure exported CSV files include the comments column.
 
-## Session Persistence (DB)
-When a log folder is opened and updated (comments, exclusions), save all details in a .txt format.
-Allow other users to load the .txt file to view previously stored information without reloading the log folder.
-
 --------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# Strengths of the Tool
-## Core Functionality:
-Parsing and filtering simulation/compile logs
-Multi-column sorting and search
-Export to CSV
-  
-## User Experience:
-Simple setup and usage instructions
-GUI-based interaction
-  
-## Collaboration Features:
-Multi-user support
-Commenting and exclusion management
-  
-## Persistence:
-Session saving and reloading via .txt files
+# Features
+Filtering: Per-column, including numeric range for "Count".
+Sorting: Multi-column sorting with Shift+Click.
+Exclusion: Add/view/export/import/clear exclusion list.
+Summary: Aggregates error/warning/fatal counts per testcase/option.
+Export: Filtered data and summary can be exported to CSV.
+Find: Regex and plain text search with highlighting.
+Persistence: Remembers window size, position, column widths, recent folders, and exclusions.
+Error Handling: Logs uncaught exceptions and shows user-friendly error dialogs.
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # Suggestions for Improvement
-## User Interface Enhancements:
-Add tooltips or inline help for each menu option.
-Include a progress bar or loading indicator when parsing large logs.
-  
-## Performance Optimization:
-Consider lazy loading or chunked reading for very large log files.
-Add memory usage stats or warnings if logs are too large.
-  
-## Error Handling:
-Display user-friendly error messages for unsupported formats or missing files.
-Log internal errors to a separate debug file for troubleshooting.
-  
-## Search Improvements:
-Support for regex-based search.
-Highlight search terms in the results.
   
 ## Visualization:
 Add basic charts (e.g., pie chart of error types, timeline of log events).
