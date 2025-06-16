@@ -5,6 +5,7 @@ import gzip
 import re
 import logging
 import traceback
+import psutil
 from collections import Counter, defaultdict
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QFileDialog, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
@@ -65,7 +66,7 @@ def open_log_file_anytype(filepath):
     else:
         return open(filepath, 'r', encoding='utf-8', errors='ignore')
 
-def parse_log_file(filepath):
+def parse_log_file(filepath, max_lines=100000):
     error_pattern = re.compile(r'UVM_ERROR')
     warning_pattern = re.compile(r'UVM_WARNING')
     star_e_pattern = re.compile(r'^\*E')
@@ -121,16 +122,16 @@ def extract_log_info(filepath):
 def group_rows(rows):
     grouped = defaultdict(lambda: [None, None, set(), None, 0, None, None, None, None])
     for row in rows:
-        # Key: (TestCase, Message, Type, LogType, LogFilePath)
+        # Key: (Test Case, Message, Type, Log Type, Log File Path)
         key = (row[1], row[5], row[3], row[6], row[7])
         if grouped[key][0] is None:
             grouped[key][0] = row[0]  # ID (first one)
-            grouped[key][1] = row[1]  # TestCase
+            grouped[key][1] = row[1]  # Test Case
             grouped[key][3] = row[3]  # Type
             grouped[key][5] = row[5]  # Message
-            grouped[key][6] = row[6]  # LogType
-            grouped[key][7] = row[7]  # LogFilePath
-        grouped[key][2].add(row[2])  # TestOption (collect all)
+            grouped[key][6] = row[6]  # Log Type
+            grouped[key][7] = row[7]  # Log File Path
+        grouped[key][2].add(row[2])  # Test Option (collect all)
         grouped[key][4] += int(row[4])  # Sum Count
     # Convert set of TestOptions to comma-separated string
     result = []
@@ -138,6 +139,11 @@ def group_rows(rows):
         v[2] = ",".join(sorted(v[2]))
         result.append(v)
     return result
+
+def get_memory_usage_mb():
+    process = psutil.Process(os.getpid())
+    mem = process.memory_info().rss / (1024 * 1024)
+    return mem
 
 class FindDialog(QDialog):
     def __init__(self, parent, table, columns):
@@ -150,8 +156,11 @@ class FindDialog(QDialog):
         self.current = -1
         layout = QVBoxLayout(self)
         self.input = QLineEdit(self)
-        self.input.setPlaceholderText("Enter search text...")
+        self.input.setPlaceholderText("Enter search text (supports regex)...")
         layout.addWidget(self.input)
+        from PyQt5.QtWidgets import QCheckBox
+        self.regex_checkbox = QCheckBox("Regex", self)
+        layout.addWidget(self.regex_checkbox)
         btns = QHBoxLayout()
         self.find_btn = QPushButton("Find All", self)
         self.find_btn.clicked.connect(self.find_all)
@@ -168,16 +177,32 @@ class FindDialog(QDialog):
         self.highlight_role = Qt.yellow
 
     def find_all(self):
-        term = self.input.text().strip().lower()
+        term = self.input.text().strip()
         self.clear_highlight()
         self.matches = []
         if not term:
             return
+        use_regex = self.regex_checkbox.isChecked()
+        try:
+            if use_regex:
+                pattern = re.compile(term, re.IGNORECASE)
+            else:
+                pattern = None
+        except re.error as e:
+            QMessageBox.warning(self, "Regex Error", f"Invalid regex pattern:\n{e}")
+            return
+
         for i in range(self.table.rowCount()):
             for j in range(self.table.columnCount()):
-                if term in str(self.table.item(i, j).text()).lower():
-                    self.matches.append(i)
-                    break
+                cell_text = str(self.table.item(i, j).text())
+                if use_regex:
+                    if pattern.search(cell_text):
+                        self.matches.append(i)
+                        break
+                else:
+                    if term.lower() in cell_text.lower():
+                        self.matches.append(i)
+                        break
         for i in self.matches:
             for j in range(self.table.columnCount()):
                 self.table.item(i, j).setBackground(self.highlight_role)
@@ -244,7 +269,7 @@ class LogTriageWindow(QMainWindow):
         super().__init__()
         self.comments_dict = {}  # Maps a unique row key to the comment
         self.setWindowTitle("Log Triage v1.0 (PyQt5)")
-        self.columns = ["ID", "TestCase", "TestOption", "Type", "Count", "Message", "LogType", "LogFilePath", "Comments"]
+        self.columns = ["ID", "Test Case", "Test Option", "Type", "Count", "Message", "Log Type", "Log File Path", "Comments"]
         self.settings = QSettings("LogTriage", "LogTriageApp")
         self.all_rows = []
         self.filtered_rows = []
@@ -259,7 +284,7 @@ class LogTriageWindow(QMainWindow):
         self.exclusion_list = set()
 
     def init_ui(self):
-        default_colwidths = [80, 250, 300, 70, 60, 400, 80, 400]
+        default_colwidths = [100, 250, 300, 200, 80, 400, 80, 500, 100]
         central = QWidget()
         vbox = QVBoxLayout(central)
         self.setCentralWidget(central)
@@ -276,8 +301,8 @@ class LogTriageWindow(QMainWindow):
         self.table.customContextMenuRequested.connect(self.show_context_menu)
         self.table.horizontalHeader().sectionClicked.connect(self.handle_header_click)
         self.table.horizontalHeader().sectionResized.connect(self.update_filter_row_geometry)
-        self.table.horizontalScrollBar().valueChanged.connect(self.update_filter_row_geometry)
         self.table.horizontalHeader().sectionMoved.connect(self.update_filter_row_geometry)
+        self.table.horizontalScrollBar().valueChanged.connect(self.update_filter_row_geometry)
         self.table.verticalScrollBar().valueChanged.connect(self.update_filter_row_geometry)
         self.table.viewport().installEventFilter(self)
         self.table.itemChanged.connect(self.handle_comment_edit)
@@ -294,6 +319,9 @@ class LogTriageWindow(QMainWindow):
             edit.textChanged.connect(self.apply_filters)
             filter_layout.addWidget(edit)
             self.filter_edits.append(edit)
+
+        self.filter_row_widget.setParent(self.table.viewport())
+        self.filter_row_widget.raise_()
 
         # Add filter row and table to layout (filter row first)
         vbox.addWidget(self.filter_row_widget)
@@ -395,7 +423,9 @@ class LogTriageWindow(QMainWindow):
     def update_filter_row_geometry(self):
         header = self.table.horizontalHeader()
         y = header.height() - 1  # Just below the header
-        self.filter_row_widget.move(0, y)
+        x_offset = -self.table.horizontalScrollBar().value()
+        self.filter_row_widget.move(x_offset, y)
+        self.filter_row_widget.setFixedHeight(self.filter_row_widget.sizeHint().height())
         # Set width and position of each filter box to match column
         for i, edit in enumerate(self.filter_edits):
             x = self.table.columnViewportPosition(i)
@@ -659,12 +689,18 @@ class LogTriageWindow(QMainWindow):
             self.filtered_rows.append(row)
         self.update_table()
         stats = self.get_message_stats()
+        mem = get_memory_usage_mb()
         self.statusbar.showMessage(
-            f"Showing {len(self.filtered_rows)} rows | "
+            f"Showing {len(self.filtered_rows)} rows | Memory: {mem:.1f} MB | "
             f"ERROR: {stats['ERROR']['total']} ({stats['ERROR']['unique']} unique), "
             f"FATAL: {stats['FATAL']['total']} ({stats['FATAL']['unique']} unique), "
             f"WARNING: {stats['WARNING']['total']} ({stats['WARNING']['unique']} unique)"
         )
+        if mem > 500:
+            QMessageBox.warning(self, "Memory Usage Warning",
+                f"High memory usage detected: {mem:.1f} MB.\n"
+                "Consider filtering or reducing the number of loaded files.")
+
         self.update_filter_row_geometry()
 
     def update_table(self):
@@ -743,7 +779,6 @@ class LogTriageWindow(QMainWindow):
         # self.table.resizeColumnsToContents()
         self.table.setColumnHidden(7, False)
         self.update_filter_row_geometry()
-
 
     # --- Export ---
     def export_to_csv(self):
@@ -896,7 +931,7 @@ class LogTriageWindow(QMainWindow):
     def show_author(self):
         QMessageBox.information(self, "Author",
             "LogTriage Application\n"
-            "Author: Johnson Amalraj (I77655)\n"
+            "Author: Johnson Amalraj (I77655) with help of https://chatbot/\n"
             "Contact: johnson.amalraj@microchip.com"
         )
 
