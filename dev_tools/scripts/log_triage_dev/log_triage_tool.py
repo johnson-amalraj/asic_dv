@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout, QLineEdit, QLabel, QProgressBar, QMenuBar, QMenu, QAction, QMessageBox,
     QAbstractItemView, QHeaderView, QStatusBar, QDialog, QPushButton, QInputDialog, QMenu, QSizePolicy, QGridLayout
 )
-from PyQt5.QtCore import Qt, QSettings
+from PyQt5.QtCore import Qt, QSettings, QThread, pyqtSignal
 
 SETTINGS_ORG = "LogTriage"
 SETTINGS_APP = "LogTriageApp"
@@ -228,15 +228,16 @@ class SummaryDialog(QDialog):
     def __init__(self, summary_rows, parent=None, statusbar=None):
         super().__init__(parent)
         self.setWindowTitle("Summary Table")
-        self.resize(700, 400)
+        self.resize(900, 400)
         self.statusbar = statusbar
         layout = QVBoxLayout(self)
-        self.table = QTableWidget(len(summary_rows), 5)
-        self.table.setHorizontalHeaderLabels(["Testcase", "TestOpt", "ERROR", "FATAL", "WARNING"])
+        # 8 columns: Testcase, TestOpt, ERROR, ERROR(unique), FATAL, FATAL(unique), WARNING, WARNING(unique)
+        headers = ["Testcase", "TestOpt", "ERROR", "ERROR (unique)", "FATAL", "FATAL (unique)", "WARNING", "WARNING (unique)"]
+        self.table = QTableWidget(len(summary_rows), len(headers))
+        self.table.setHorizontalHeaderLabels(headers)
         for i, row in enumerate(summary_rows):
             for j, val in enumerate(row):
                 self.table.setItem(i, j, QTableWidgetItem(str(val)))
-        # self.table.resizeColumnsToContents()
         layout.addWidget(self.table)
         export_btn = QPushButton("Export Summary to CSV", self)
         export_btn.clicked.connect(self.export_summary)
@@ -244,7 +245,6 @@ class SummaryDialog(QDialog):
 
     def export_summary(self):
         try:
-            # Get the directory where the script is running
             default_dir = os.getcwd()
             path, _ = QFileDialog.getSaveFileName(self, "Export Summary to CSV", default_dir, "CSV Files (*.csv)")
             if not path:
@@ -252,7 +252,7 @@ class SummaryDialog(QDialog):
             path = path.strip()
             with open(path, "w", newline='', encoding="utf-8") as f:
                 writer = csv.writer(f)
-                writer.writerow(["Testcase", "TestOpt", "ERROR", "FATAL", "WARNING"])
+                writer.writerow([self.table.horizontalHeaderItem(i).text() for i in range(self.table.columnCount())])
                 for i in range(self.table.rowCount()):
                     row = [self.table.item(i, j).text() if self.table.item(i, j) else "" for j in range(self.table.columnCount())]
                     writer.writerow(row)
@@ -435,7 +435,8 @@ class LogTriageWindow(QMainWindow):
         self.filter_row_widget.setFixedWidth(self.table.viewport().width())
 
     def handle_comment_edit(self, item):
-        if item.column() == len(self.columns) - 1:  # Comments column
+        comments_col = self.columns.index("Comments")
+        if item.column() == comments_col:
             # Get the row's unique key (excluding Comments)
             row_data = []
             for col in range(len(self.columns) - 1):
@@ -563,6 +564,17 @@ class LogTriageWindow(QMainWindow):
         show_summary_action.triggered.connect(self.show_summary)
         summary_menu.addAction(show_summary_action)
 
+        # In File menu
+        save_session_action = QAction("Save Session", self)
+        save_session_action.setShortcut("Ctrl+Shift+S")
+        save_session_action.triggered.connect(self.save_session)
+        file_menu.addAction(save_session_action)
+        
+        load_session_action = QAction("Load Session", self)
+        load_session_action.setShortcut("Ctrl+Shift+O")
+        load_session_action.triggered.connect(self.load_session)
+        file_menu.addAction(load_session_action)
+
         # Help menu
         help_menu = self.menu.addMenu("&Help")
         shortcut_action = QAction("Shortcut Keys", self)
@@ -593,18 +605,7 @@ class LogTriageWindow(QMainWindow):
 
     # --- Log Loading ---
     def load_log_folder(self, folder=None):
-        if not folder:
-            last_folder = self.settings.value("lastFolder", "")
-            folder = QFileDialog.getExistingDirectory(self, "Select Log Folder", last_folder or "")
-            if not folder:
-                return
-            folder = folder.strip()
-        if not os.path.isdir(folder):
-            QMessageBox.warning(self, "Invalid Path", f"The path '{folder}' is not a valid directory.")
-            return
-        self.loaded_folder = folder
-        self.settings.setValue(LAST_FOLDER_KEY, folder)
-        QApplication.processEvents()
+        # ... (existing code to get folder)
         # Find log files
         log_files = []
         for root, dirs, files in os.walk(folder):
@@ -615,44 +616,25 @@ class LogTriageWindow(QMainWindow):
         self.progress.setMaximum(len(log_files))
         self.progress.setValue(0)
         self.progress.setFormat(f"Loading 0/{len(log_files)} files...")
-        self.all_rows = []
-        batch_size = 10
-        for idx, filepath in enumerate(log_files):
-            id_val, testcase, testopt = extract_log_info(filepath)
-            error_counts, fatal_counts, warning_counts = parse_log_file(filepath)
-            for msg, count in error_counts.items():
-                if not self.show_scoreboard and "sbd_compare" in msg.lower():
-                    continue
-                row = [
-                    id_val, testcase, testopt, "ERROR", count, msg, "simulate" if "simulate" in os.path.basename(filepath) else "compile", filepath
-                ]
-                self.all_rows.append(row)
-            for msg, count in fatal_counts.items():
-                if not self.show_scoreboard and "sbd_compare" in msg.lower():
-                    continue
-                row = [
-                    id_val, testcase, testopt, "FATAL", count, msg, "simulate" if "simulate" in os.path.basename(filepath) else "compile", filepath
-                ]
-                self.all_rows.append(row)
-            for msg, count in warning_counts.items():
-                if not self.show_scoreboard and "sbd_compare" in msg.lower():
-                    continue
-                row = [
-                    id_val, testcase, testopt, "WARNING", count, msg, "simulate" if "simulate" in os.path.basename(filepath) else "compile", filepath
-                ]
-                self.all_rows.append(row)
-            if (idx+1) % batch_size == 0 or idx == len(log_files)-1:
-                self.progress.setValue(idx+1)
-                self.progress.setFormat(f"Loading {idx+1}/{len(log_files)} files...")
-                QApplication.processEvents()
-        self.progress.setValue(len(log_files))
-        self.progress.setFormat(f"Loaded {len(log_files)}/{len(log_files)} files.")
-        self.folder_status_label.setText(f"Loaded log file folder path: {folder}")
-
+    
+        # Start worker thread
+        self.worker = LogParseWorker(log_files, self.show_simulate, self.show_compile, self.show_scoreboard)
+        self.worker.progress.connect(self.on_parse_progress)
+        self.worker.finished.connect(self.on_parse_finished)
+        self.worker.start()
+    
+    def on_parse_progress(self, current, total):
+        self.progress.setValue(current)
+        self.progress.setFormat(f"Loading {current}/{total} files...")
+        QApplication.processEvents()
+    
+    def on_parse_finished(self, all_rows):
+        self.progress.setValue(self.progress.maximum())
+        self.progress.setFormat(f"Loaded {self.progress.maximum()}/{self.progress.maximum()} files.")
+        self.folder_status_label.setText(f"Loaded log file folder path: {self.loaded_folder}")
+        self.all_rows = group_rows(all_rows)
         self.filtered_rows = self.all_rows.copy()
-        self.all_rows = group_rows(self.all_rows)
-        self.filtered_rows = self.all_rows.copy()
-        self.apply_filters()  # This ensures the exclusion list is applied to new data
+        self.apply_filters()
         self.update_table()
 
     def reload_last_folder(self):
@@ -730,18 +712,6 @@ class LogTriageWindow(QMainWindow):
         self.table.setSortingEnabled(True)  # Re-enable sorting after populating
         if self.sort_order:
             self.sort_table_multi()
-
-    def import_exclusion_list(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Import Exclusion List", os.getcwd(), "Text Files (*.txt);;CSV Files (*.csv)")
-        if not path:
-            return
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                self.exclusion_list = set(line.strip() for line in f if line.strip())
-            self.apply_filters()
-            self.statusbar.showMessage(f"Exclusion list imported from {path} and applied to current data.")
-        except Exception as e:
-            QMessageBox.critical(self, "Import Error", f"Failed to import exclusion list:\n{e}")
 
     # --- Multi-column sorting ---
     def handle_header_click(self, logicalIndex):
@@ -841,7 +811,7 @@ class LogTriageWindow(QMainWindow):
             with open(path, "r", encoding="utf-8") as f:
                 self.exclusion_list = set(line.strip() for line in f if line.strip())
             self.apply_filters()
-            self.statusbar.showMessage(f"Exclusion list imported from {path}")
+            self.statusbar.showMessage(f"Exclusion list imported from {path} and applied to current data.")
         except Exception as e:
             QMessageBox.critical(self, "Import Error", f"Failed to import exclusion list:\n{e}")
 
@@ -977,10 +947,134 @@ class LogTriageWindow(QMainWindow):
         self.show_scoreboard = self.scoreboard_action.isChecked()
         self.apply_filters()
 
+    def save_session(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Save Session", os.getcwd(), "Text Files (*.txt)")
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("# LogTriage Session File v1\n")
+                f.write("[ROWS]\n")
+                writer = csv.writer(f)
+                writer.writerow(self.columns)
+                for row in self.all_rows:
+                    row_key = tuple(row[:-1])
+                    comment = self.comments_dict.get(row_key, "")
+                    writer.writerow(list(row[:-1]) + [comment])
+                f.write("[EXCLUSIONS]\n")
+                for msg in sorted(self.exclusion_list):
+                    f.write(msg + "\n")
+            self.statusbar.showMessage(f"Session saved to {path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Save Session Error", f"Failed to save session:\n{e}")
+
+    def load_session(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Load Session", os.getcwd(), "Text Files (*.txt)")
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            # Parse sections
+            rows_section = False
+            exclusions_section = False
+            rows = []
+            comments_dict = {}
+            exclusion_list = set()
+            reader = None
+            for line in lines:
+                line = line.rstrip("\n")
+                if line.startswith("#"):
+                    continue
+                if line == "[ROWS]":
+                    rows_section = True
+                    exclusions_section = False
+                    continue
+                if line == "[EXCLUSIONS]":
+                    exclusions_section = True
+                    rows_section = False
+                    continue
+                if rows_section:
+                    if reader is None:
+                        # Header line
+                        header = next(csv.reader([line]))
+                        reader = []
+                        continue
+                    else:
+                        row = next(csv.reader([line]))
+                        # row: [ID, Test Case, Test Option, Type, Count, Message, Log Type, Log File Path, Comments]
+                        comments = row[-1]
+                        row_data = row[:-1]
+                        rows.append(row_data + [comments])
+                        row_key = tuple(row_data)
+                        comments_dict[row_key] = comments
+                elif exclusions_section:
+                    if line.strip():
+                        exclusion_list.add(line.strip())
+            # Restore state
+            self.all_rows = [row[:-1] for row in rows]  # Remove comments for all_rows
+            self.comments_dict = comments_dict
+            self.exclusion_list = exclusion_list
+            self.filtered_rows = self.all_rows.copy()
+            self.apply_filters()
+            self.update_table()
+            stats = self.get_message_stats()
+            mem = get_memory_usage_mb()
+            self.folder_status_label.setText(f"Loaded session file: {os.path.basename(path)}")
+            self.statusbar.showMessage(
+                f"Session loaded from {path} | Showing {len(self.filtered_rows)} rows | Memory: {mem:.1f} MB | "
+                f"ERROR: {stats['ERROR']['total']} ({stats['ERROR']['unique']} unique), "
+                f"FATAL: {stats['FATAL']['total']} ({stats['FATAL']['unique']} unique), "
+                f"WARNING: {stats['WARNING']['total']} ({stats['WARNING']['unique']} unique)"
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Load Session Error", f"Failed to load session:\n{e}")
+
     # --- Find dialog ---
     def show_find_dialog(self):
         dlg = FindDialog(self, self.table, self.columns)
         dlg.exec_()
+
+class LogParseWorker(QThread):
+    progress = pyqtSignal(int, int)  # current, total
+    finished = pyqtSignal(list)      # all_rows
+
+    def __init__(self, log_files, show_simulate, show_compile, show_scoreboard):
+        super().__init__()
+        self.memory_warning_threshold_mb = 500  # You can make this configurable via a settings dialog
+        self.log_files = log_files
+        self.show_simulate = show_simulate
+        self.show_compile = show_compile
+        self.show_scoreboard = show_scoreboard
+
+    def run(self):
+        all_rows = []
+        for idx, filepath in enumerate(self.log_files):
+            id_val, testcase, testopt = extract_log_info(filepath)
+            error_counts, fatal_counts, warning_counts = parse_log_file(filepath)
+            for msg, count in error_counts.items():
+                if not self.show_scoreboard and "sbd_compare" in msg.lower():
+                    continue
+                row = [
+                    id_val, testcase, testopt, "ERROR", count, msg, "simulate" if "simulate" in os.path.basename(filepath) else "compile", filepath
+                ]
+                all_rows.append(row)
+            for msg, count in fatal_counts.items():
+                if not self.show_scoreboard and "sbd_compare" in msg.lower():
+                    continue
+                row = [
+                    id_val, testcase, testopt, "FATAL", count, msg, "simulate" if "simulate" in os.path.basename(filepath) else "compile", filepath
+                ]
+                all_rows.append(row)
+            for msg, count in warning_counts.items():
+                if not self.show_scoreboard and "sbd_compare" in msg.lower():
+                    continue
+                row = [
+                    id_val, testcase, testopt, "WARNING", count, msg, "simulate" if "simulate" in os.path.basename(filepath) else "compile", filepath
+                ]
+                all_rows.append(row)
+            self.progress.emit(idx+1, len(self.log_files))
+        self.finished.emit(all_rows)
 
 if __name__ == "__main__":
     logging.basicConfig(
