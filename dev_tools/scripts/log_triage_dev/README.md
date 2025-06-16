@@ -59,3 +59,6 @@ Auto-Triage Suggestions: Use simple heuristics or ML to suggest likely causes or
 Integration Hooks: Allow integration with bug tracking tools (e.g., JIRA) or CI/CD pipelines.
 Dark Mode: For better readability during long debugging sessions.
 Command Line Interface (CLI): For users who prefer scripting or automation.
+Column Visibility: Allow users to hide/show columns (e.g., log file path).
+Advanced Filtering: Support AND/OR logic in filters, or allow users to save filter presets.
+Log File Preview: On double-click, show a preview of the log message in a dialog, with context lines.
