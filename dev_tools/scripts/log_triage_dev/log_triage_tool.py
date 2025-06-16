@@ -581,16 +581,17 @@ class LogTriageWindow(QMainWindow):
         show_summary_action.triggered.connect(self.show_summary)
         summary_menu.addAction(show_summary_action)
 
-        # In File menu
+        # In Session menu
+        session_menu = self.menu.addMenu("&Session")
         save_session_action = QAction("Save Session", self)
         save_session_action.setShortcut("Ctrl+Shift+S")
         save_session_action.triggered.connect(self.save_session)
-        file_menu.addAction(save_session_action)
+        session_menu.addAction(save_session_action)
         
         load_session_action = QAction("Load Session", self)
         load_session_action.setShortcut("Ctrl+Shift+O")
         load_session_action.triggered.connect(self.load_session)
-        file_menu.addAction(load_session_action)
+        session_menu.addAction(load_session_action)
 
         # Help menu
         help_menu = self.menu.addMenu("&Help")
@@ -1005,6 +1006,7 @@ class LogTriageWindow(QMainWindow):
 
     def save_session(self):
         # --- Fix: Commit any in-progress edits ---
+        default_dir = os.getcwd()
         comments_col = self.columns.index("Comments")
         for row in range(self.table.rowCount()):
             item = self.table.item(row, comments_col)
@@ -1016,7 +1018,7 @@ class LogTriageWindow(QMainWindow):
         # --- Fix: Update comments_dict from table ---
         self.update_comments_dict_from_table()
     
-        path, _ = QFileDialog.getSaveFileName(self, "Save Session", os.getcwd(), "Text Files (*.txt)")
+        path, _ = QFileDialog.getSaveFileName(self, "Save Session", default_dir, "CSV Files (*.csv)")
         if not path:
             return
         try:
@@ -1050,7 +1052,8 @@ class LogTriageWindow(QMainWindow):
             self.comments_dict[(row_key, self.current_user)] = comment
 
     def load_session(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Load Session", os.getcwd(), "Text Files (*.txt)")
+        default_dir = os.getcwd()
+        path, _ = QFileDialog.getOpenFileName(self, "Load Session", default_dir, "CSV Files (*.csv)")
         if not path:
             return
         try:
