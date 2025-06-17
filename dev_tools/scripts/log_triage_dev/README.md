@@ -26,21 +26,15 @@ On Local : python3 new_ver.py
 # TODO
 
 ## Exclusion
-Redesign the GUI for managing exclusions.
-Enable reading and reapplying exclusion lists to the currently loaded log path.
-
-## Comments & Feedback
-- Need to remove the login window.
-- Instead of the multi user comments, Just i want to store the comments, whoever enters.
-
-#### Example:
-- If I opened the log folder/older saved session, I entered the comments, and saved the session.
-- Others can able to open the session, and add their comments in new line without overriding my comments (they able to see my comments), 
-- then they can able to save the session. so anyone can able to add comemtns without overriding the existing comments, and save the session with updated comments
+Need to seelct multiple rows to add exclusion.
+The excluded rows should be in gery color, to easy identify the exclusion
+Then i can save the exclsuion list in csv format.
+once i reopneed the GUI i can import the saved exclusion.csv, so it should be load the table properly.
+This needs to be work properly for session load / log file folder Loading.
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# Features TODO
+# Features
 
 ## Filtering: 
 Per-column, including numeric range for "Count".
