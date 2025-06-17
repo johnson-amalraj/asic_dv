@@ -701,8 +701,6 @@ class LogTriageWindow(QMainWindow):
             # Only filter scoreboard errors here
             if not self.show_scoreboard and "sbd_compare" in str(row[5]).lower():
                 continue
-            if row[5] in self.exclusion_list:
-                continue
             self.filtered_rows.append(row)
         self.update_table()
         stats = self.get_message_stats()
@@ -724,9 +722,9 @@ class LogTriageWindow(QMainWindow):
         self.table.setSortingEnabled(False)  # Disable sorting while populating
         self.table.setRowCount(len(self.filtered_rows))
         for i, row in enumerate(self.filtered_rows):
+            is_excluded = row[5] in self.exclusion_list  # Message column
             for j, val in enumerate(row):
                 if j == len(self.columns) - 1:  # Comments column
-                    # When setting the Comments column:
                     row_key = tuple(row[:-1])  # Exclude Comments column
                     comment = self.comments_dict.get(row_key, "")
                     item = QTableWidgetItem(comment)
@@ -741,7 +739,9 @@ class LogTriageWindow(QMainWindow):
                         item.setForeground(Qt.darkYellow)
                     if j == 5:
                         item.setToolTip(str(val))
-                    pass
+                # --- Grey out excluded rows ---
+                if is_excluded:
+                    item.setBackground(Qt.lightGray)
                 self.table.setItem(i, j, item)
         self.table.setColumnHidden(7, False)
         self.table.setSortingEnabled(True)  # Re-enable sorting after populating
@@ -776,6 +776,7 @@ class LogTriageWindow(QMainWindow):
     def update_table_no_sort(self):
         self.table.setRowCount(len(self.filtered_rows))
         for i, row in enumerate(self.filtered_rows):
+            is_excluded = row[5] in self.exclusion_list  # Message column
             for j, val in enumerate(row):
                 item = QTableWidgetItem(str(val))
                 if row[3] == "ERROR":
@@ -786,6 +787,9 @@ class LogTriageWindow(QMainWindow):
                     item.setForeground(Qt.darkYellow)
                 if j == 5:
                     item.setToolTip(str(val))
+                # --- Grey out excluded rows ---
+                if is_excluded:
+                    item.setBackground(Qt.lightGray)
                 self.table.setItem(i, j, item)
         # self.table.resizeColumnsToContents()
         self.table.setColumnHidden(7, False)
@@ -834,25 +838,28 @@ class LogTriageWindow(QMainWindow):
         QMessageBox.information(self, "Exclusion List", msg)
 
     def export_exclusion_list(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Export Exclusion List", os.getcwd(), "Text Files (*.txt);;CSV Files (*.csv)")
+        path, _ = QFileDialog.getSaveFileName(self, "Export Exclusion List", os.getcwd(), "CSV Files (*.csv)")
         if not path:
             return
         try:
-            with open(path, "w", encoding="utf-8") as f:
+            with open(path, "w", newline='', encoding="utf-8") as f:
+                writer = csv.writer(f)
                 for msg in sorted(self.exclusion_list):
-                    f.write(msg + "\n")
+                    writer.writerow([msg])
             self.statusbar.showMessage(f"Exclusion list exported to {path}")
         except Exception as e:
             QMessageBox.critical(self, "Export Error", f"Failed to export exclusion list:\n{e}")
-    
+
     def import_exclusion_list(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Import Exclusion List", os.getcwd(), "Text Files (*.txt);;CSV Files (*.csv)")
+        path, _ = QFileDialog.getOpenFileName(self, "Import Exclusion List", os.getcwd(), "CSV Files (*.csv)")
         if not path:
             return
         try:
             with open(path, "r", encoding="utf-8") as f:
-                self.exclusion_list = set(line.strip() for line in f if line.strip())
+                reader = csv.reader(f)
+                self.exclusion_list = set(row[0] for row in reader if row)
             self.apply_filters()
+            self.update_table()
             self.statusbar.showMessage(f"Exclusion list imported from {path} and applied to current data.")
         except Exception as e:
             QMessageBox.critical(self, "Import Error", f"Failed to import exclusion list:\n{e}")
@@ -1037,6 +1044,9 @@ class LogTriageWindow(QMainWindow):
                 f.write("[COMMENTS]\n")
                 for key, comment in self.comments_dict.items():
                     writer.writerow(list(key) + [comment])
+                f.write("[EXCLUSIONS]\n")
+                for msg in self.exclusion_list:
+                    writer.writerow([msg])
             self.statusbar.showMessage(f"Session saved to {path}")
         except Exception as e:
             QMessageBox.critical(self, "Save Session Error", f"Failed to save session:\n{e}")
@@ -1101,9 +1111,9 @@ class LogTriageWindow(QMainWindow):
                 # If next section is [EXCLUSIONS], read exclusions
                 exclusion_list = set()
                 if section_header == "[EXCLUSIONS]":
-                    for line in f:
-                        if line.strip() and not line.startswith("["):
-                            exclusion_list.add(line.strip())
+                    for row in csv.reader(f):
+                        if row and not row[0].startswith("["):
+                            exclusion_list.add(row[0])
     
             # Restore state
             self.all_rows = rows
