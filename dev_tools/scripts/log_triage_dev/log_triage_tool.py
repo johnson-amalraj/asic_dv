@@ -6,11 +6,12 @@ import re
 import logging
 import traceback
 import psutil
+import itertools
 from collections import Counter, defaultdict
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QFileDialog, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
     QHBoxLayout, QLineEdit, QLabel, QProgressBar, QMenuBar, QMenu, QAction, QMessageBox,
-    QAbstractItemView, QHeaderView, QStatusBar, QDialog, QPushButton, QInputDialog, QMenu, QSizePolicy, QGridLayout
+    QAbstractItemView, QHeaderView, QStatusBar, QDialog, QPushButton, QInputDialog, QMenu, QSizePolicy, QTextEdit, QGridLayout
 )
 from PyQt5.QtCore import Qt, QSettings, QThread, pyqtSignal
 
@@ -264,11 +265,31 @@ class SummaryDialog(QDialog):
                 self.statusbar.showMessage(f"Failed to export summary: {e}")
             QMessageBox.critical(self, "Export Error", f"Failed to export summary:\n{e}")
 
+class CommentEditDialog(QDialog):
+    def __init__(self, initial_text="", parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Edit Comment")
+        self.resize(400, 200)
+        layout = QVBoxLayout(self)
+        self.text_edit = QTextEdit(self)
+        self.text_edit.setPlainText(initial_text)
+        layout.addWidget(self.text_edit)
+        btns = QHBoxLayout()
+        ok_btn = QPushButton("OK", self)
+        ok_btn.clicked.connect(self.accept)
+        cancel_btn = QPushButton("Cancel", self)
+        cancel_btn.clicked.connect(self.reject)
+        btns.addWidget(ok_btn)
+        btns.addWidget(cancel_btn)
+        layout.addLayout(btns)
+
+    def get_text(self):
+        return self.text_edit.toPlainText()
+
 class LogTriageWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.current_user = self.prompt_for_user()
-        self.comments_dict = {}  # {(row_key, username): comment}
+        self.comments_dict = {}  # {row_key: comment}
         self.setWindowTitle("Log Triage v2.0 (PyQt5)")
         self.columns = ["ID", "Test Case", "Test Option", "Type", "Count", "Message", "Log Type", "Log File Path", "Comments"]
         self.settings = QSettings("LogTriage", "LogTriageApp")
@@ -283,22 +304,6 @@ class LogTriageWindow(QMainWindow):
         self.init_ui()
         self.restore_settings()
         self.exclusion_list = set()
-
-    def prompt_for_user(self):
-        user, ok = QInputDialog.getText(self, "User Login", "Enter your username:")
-        if not ok or not user.strip():
-            user = "default"
-        return user.strip()
-
-    def handle_comment_edit(self, item):
-        comments_col = self.columns.index("Comments")
-        if item.column() == comments_col:
-            row_data = [] # Get the row's unique key (excluding Comments)
-            for col in range(len(self.columns) - 1):
-                cell = self.table.item(item.row(), col)
-                row_data.append(cell.text() if cell else "")
-            row_key = tuple(row_data)
-            self.comments_dict[(row_key, self.current_user)] = item.text()
 
     def init_ui(self):
         default_colwidths = [100, 250, 300, 200, 80, 400, 80, 500, 100]
@@ -460,6 +465,7 @@ class LogTriageWindow(QMainWindow):
                 cell = self.table.item(item.row(), col)
                 row_data.append(cell.text() if cell else "")
             row_key = tuple(row_data)
+            # Store the entire comment (multi-line)
             self.comments_dict[row_key] = item.text()
 
     def get_message_stats(self):
@@ -720,8 +726,9 @@ class LogTriageWindow(QMainWindow):
         for i, row in enumerate(self.filtered_rows):
             for j, val in enumerate(row):
                 if j == len(self.columns) - 1:  # Comments column
-                    row_key = tuple(row[:-1]) # Get unique key for this row (excluding Comments)
-                    comment = self.comments_dict.get((row_key, self.current_user), "")
+                    # When setting the Comments column:
+                    row_key = tuple(row[:-1])  # Exclude Comments column
+                    comment = self.comments_dict.get(row_key, "")
                     item = QTableWidgetItem(comment)
                     item.setFlags(item.flags() | Qt.ItemIsEditable)
                 else:
@@ -736,7 +743,6 @@ class LogTriageWindow(QMainWindow):
                         item.setToolTip(str(val))
                     pass
                 self.table.setItem(i, j, item)
-        # self.table.resizeColumnsToContents()
         self.table.setColumnHidden(7, False)
         self.table.setSortingEnabled(True)  # Re-enable sorting after populating
         if self.sort_order:
@@ -795,18 +801,14 @@ class LogTriageWindow(QMainWindow):
             return
         path = path.strip()
         try:
-            # Find all users
-            users = set(u for (_, u) in self.comments_dict.keys())
-            user_list = sorted(users)
-            # Add user comment columns
-            export_columns = self.columns[:-1] + [f"Comment ({u})" for u in user_list]
+            export_columns = self.columns
             with open(path, "w", newline='', encoding="utf-8") as f:
                 writer = csv.writer(f)
                 writer.writerow(export_columns)
                 for row in self.filtered_rows:
                     row_key = tuple(row[:-1])
-                    comments = [self.comments_dict.get((row_key, u), "") for u in user_list]
-                    writer.writerow(list(row[:-1]) + comments)
+                    comment = self.comments_dict.get(row_key, "")
+                    writer.writerow(list(row[:-1]) + [comment])
             self.statusbar.showMessage(f"Exported {len(self.filtered_rows)} rows to {path}")
         except Exception as e:
             self.statusbar.showMessage(f"Failed to export: {e}")
@@ -905,11 +907,8 @@ class LogTriageWindow(QMainWindow):
             return
         row = selected[0].row()
         row_key = tuple(self.table.item(row, col).text() for col in range(len(self.columns) - 1))
-        comments = []
-        for (rk, user), comment in self.comments_dict.items():
-            if rk == row_key and comment.strip():
-                comments.append(f"{user}: {comment}")
-        msg = "\n".join(comments) if comments else "(No comments)"
+        comment = self.comments_dict.get(row_key, "")
+        msg = comment if comment.strip() else "(No comments)"
         QMessageBox.information(self, "All Comments", msg)
 
     def show_shortcuts(self):
@@ -984,10 +983,16 @@ class LogTriageWindow(QMainWindow):
             QMessageBox.warning(self, "Open Log File", f"File not found:\n{filepath}")
 
     def handle_table_double_click(self, index):
-        # Only open the log file if a non-Comments column is double-clicked
         if index.column() == len(self.columns) - 1:  # Comments column
-            # Let QTableWidget handle editing (do nothing here)
-            return
+            # Open dialog for multi-line editing
+            current_text = self.table.item(index.row(), index.column()).text()
+            dlg = CommentEditDialog(current_text, self)
+            if dlg.exec_() == QDialog.Accepted:
+                new_text = dlg.get_text()
+                self.table.item(index.row(), index.column()).setText(new_text)
+                # Update comments_dict
+                row_key = tuple(self.table.item(index.row(), col).text() for col in range(len(self.columns) - 1))
+                self.comments_dict[row_key] = new_text
         else:
             self.open_log_file(index)
 
@@ -1031,10 +1036,7 @@ class LogTriageWindow(QMainWindow):
                     writer.writerow(row)
                 f.write("[COMMENTS]\n")
                 for key, comment in self.comments_dict.items():
-                    if not (isinstance(key, tuple) and len(key) == 2):
-                        continue  # skip malformed keys
-                    row_key, username = key
-                    f.write(",".join(row_key) + f",{username},{comment}\n")
+                    writer.writerow(list(key) + [comment])
             self.statusbar.showMessage(f"Session saved to {path}")
         except Exception as e:
             QMessageBox.critical(self, "Save Session Error", f"Failed to save session:\n{e}")
@@ -1049,7 +1051,7 @@ class LogTriageWindow(QMainWindow):
             row_key = tuple(row_data)
             comment_item = self.table.item(row, comments_col)
             comment = comment_item.text() if comment_item else ""
-            self.comments_dict[(row_key, self.current_user)] = comment
+            self.comments_dict[row_key] = comment
 
     def load_session(self):
         default_dir = os.getcwd()
@@ -1057,49 +1059,54 @@ class LogTriageWindow(QMainWindow):
         if not path:
             return
         try:
+            # Show loading message in progress bar
+            self.progress.setFormat("Loading session file...")
+            self.progress.setMaximum(0)  # Indeterminate
+            self.progress.setValue(0)
+            QApplication.processEvents()
+
             with open(path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-    
-            section = None
-            rows = []
-            comments_dict = {}
-            exclusion_list = set()
-            header = []
-            for line in lines:
-                line = line.rstrip("\n")
-                if not line or line.startswith("#"):
-                    continue
-                if line == "[ROWS]":
-                    section = "ROWS"
-                    continue
-                elif line == "[COMMENTS]":
-                    section = "COMMENTS"
-                    continue
-                elif line == "[EXCLUSIONS]":
-                    section = "EXCLUSIONS"
-                    continue
-    
-                if section == "ROWS":
-                    if not header:
-                        header = next(csv.reader([line]))
-                        continue
-                    row = next(csv.reader([line]))
+                # Read up to [ROWS]
+                for line in f:
+                    if line.strip() == "[ROWS]":
+                        break
+                # Read header
+                header = next(csv.reader([f.readline()]))
+                # Read rows until next section
+                rows = []
+                for row in csv.reader(f):
+                    if row and row[0].startswith("["):
+                        # We've hit the next section header
+                        section_header = row[0]
+                        break
                     rows.append(row)
-                elif section == "COMMENTS":
-                    # row_key fields, username, comment
-                    parts = line.split(",")
-                    if len(parts) < len(self.columns):
-                        continue  # skip malformed
-                    row_key = tuple(parts[:len(self.columns)-1])
-                    username = parts[len(self.columns)-1]
-                    comment = ",".join(parts[len(self.columns):])
-                    comments_dict[(row_key, username)] = comment
-                elif section == "EXCLUSIONS":
-                    if line.strip():
-                        exclusion_list.add(line.strip())
+                else:
+                    section_header = None  # EOF
+    
+                # If next section is [COMMENTS], read comments
+                comments_dict = {}
+                if section_header == "[COMMENTS]":
+                    for row in csv.reader(f):
+                        if row and row[0].startswith("["):
+                            section_header = row[0]
+                            break
+                        if len(row) < len(self.columns):
+                            continue
+                        row_key = tuple(row[:len(self.columns)-1])
+                        comment = row[len(self.columns)-1]
+                        comments_dict[row_key] = comment
+                else:
+                    comments_dict = {}
+    
+                # If next section is [EXCLUSIONS], read exclusions
+                exclusion_list = set()
+                if section_header == "[EXCLUSIONS]":
+                    for line in f:
+                        if line.strip() and not line.startswith("["):
+                            exclusion_list.add(line.strip())
     
             # Restore state
-            self.all_rows = rows  # Keep the comments column
+            self.all_rows = rows
             self.comments_dict = comments_dict
             self.exclusion_list = exclusion_list
             self.filtered_rows = self.all_rows.copy()
@@ -1114,7 +1121,14 @@ class LogTriageWindow(QMainWindow):
                 f"FATAL: {stats['FATAL']['total']} ({stats['FATAL']['unique']} unique), "
                 f"WARNING: {stats['WARNING']['total']} ({stats['WARNING']['unique']} unique)"
             )
+
+            # After loading is done
+            self.progress.setMaximum(1)
+            self.progress.setValue(1)
+            self.progress.setFormat("Session loaded.")
+            QApplication.processEvents()
         except Exception as e:
+            self.progress.setFormat("Failed to load session.")
             QMessageBox.critical(self, "Load Session Error", f"Failed to load session:\n{e}")
 
     # --- Find dialog ---
