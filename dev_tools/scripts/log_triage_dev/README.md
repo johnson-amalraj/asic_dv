@@ -23,17 +23,6 @@ On Local : python3 new_ver.py
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# TODO
-
-## Exclusion
-Need to seelct multiple rows to add exclusion.
-The excluded rows should be in gery color, to easy identify the exclusion
-Then i can save the exclsuion list in csv format.
-once i reopneed the GUI i can import the saved exclusion.csv, so it should be load the table properly.
-This needs to be work properly for session load / log file folder Loading.
-
---------------------------------------------------------------------------------------------------------------------------------------------------------
-
 # Features
 
 ## Filtering: 
@@ -62,7 +51,7 @@ Logs uncaught exceptions and shows user-friendly error dialogs.
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------
   
-# Feature Ideas to Consider
+# TODO Feature Ideas to Consider
 
 ## Visualization:
 Add basic charts (e.g., pie chart of error types, timeline of log events).
