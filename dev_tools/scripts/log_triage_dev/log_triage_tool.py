@@ -11,9 +11,10 @@ from collections import Counter, defaultdict
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QFileDialog, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
     QHBoxLayout, QLineEdit, QLabel, QProgressBar, QMenuBar, QMenu, QAction, QMessageBox,
-    QAbstractItemView, QHeaderView, QStatusBar, QDialog, QPushButton, QInputDialog, QMenu, QSizePolicy, QTextEdit, QGridLayout
+    QAbstractItemView, QHeaderView, QStatusBar, QDialog, QPushButton, QInputDialog, QMenu, QSizePolicy, QTextEdit, QGridLayout, QToolBar, 
+    QCheckBox, QWidgetAction
 )
-from PyQt5.QtCore import Qt, QSettings, QThread, pyqtSignal
+from PyQt5.QtCore import Qt, QSettings, QThread, pyqtSignal, QSize
 
 SETTINGS_ORG = "LogTriage"
 SETTINGS_APP = "LogTriageApp"
@@ -290,7 +291,7 @@ class LogTriageWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.comments_dict = {}  # {row_key: comment}
-        self.setWindowTitle("Log Triage v2.0 (PyQt5)")
+        self.setWindowTitle("Log Triage v3.0 (PyQt5)")
         self.columns = ["ID", "Test Case", "Test Option", "Type", "Count", "Message", "Log Type", "Log File Path", "Comments"]
         self.settings = QSettings("LogTriage", "LogTriageApp")
         self.all_rows = []
@@ -331,7 +332,7 @@ class LogTriageWindow(QMainWindow):
 
         # --- Filter row widget (floating, below header) ---
         self.filter_row_widget = QWidget()
-        self.filter_row_widget.setStyleSheet("background: #f8f8f8; border-bottom: 1px solid #ccc;")
+        self.filter_row_widget.setObjectName("filter_row_widget")
         filter_layout = QHBoxLayout(self.filter_row_widget)
         filter_layout.setContentsMargins(0, 0, 0, 0)
         self.filter_edits = []
@@ -598,6 +599,13 @@ class LogTriageWindow(QMainWindow):
         load_session_action.setShortcut("Ctrl+Shift+O")
         load_session_action.triggered.connect(self.load_session)
         session_menu.addAction(load_session_action)
+
+        # Add Settings menu after Session
+        settings_menu = self.menu.addMenu("&Settings")
+        self.dark_mode_action = QAction("Dark Mode", self, checkable=True)
+        self.dark_mode_action.setChecked(False)
+        self.dark_mode_action.triggered.connect(self.toggle_dark_mode)
+        settings_menu.addAction(self.dark_mode_action)
 
         # Help menu
         help_menu = self.menu.addMenu("&Help")
@@ -1140,6 +1148,54 @@ class LogTriageWindow(QMainWindow):
         except Exception as e:
             self.progress.setFormat("Failed to load session.")
             QMessageBox.critical(self, "Load Session Error", f"Failed to load session:\n{e}")
+
+    def toggle_dark_mode(self):
+        if self.dark_mode_action.isChecked():
+            dark_stylesheet = """
+            QWidget {
+                background-color: #232629;
+                color: #F0F0F0;
+            }
+            QTableWidget {
+                background-color: #232629;
+                color: #F0F0F0;
+                gridline-color: #444;
+            }
+            QHeaderView::section {
+                background-color: #31363b;
+                color: #F0F0F0;
+            }
+            QLineEdit, QTextEdit {
+                background-color: #31363b;
+                color: #F0F0F0;
+                border: 1px solid #444;
+            }
+            QWidget#filter_row_widget {
+                background: #232629;
+                color: #F0F0F0;
+                border-bottom: 1px solid #444;
+            }
+            QMenuBar, QMenu, QStatusBar {
+                background-color: #232629;
+                color: #F0F0F0;
+            }
+            QProgressBar {
+                background-color: #31363b;
+                color: #F0F0F0;
+                border: 1px solid #444;
+            }
+            QProgressBar::chunk {
+                background-color: #0078d7;
+            }
+            QPushButton {
+                background-color: #31363b;
+                color: #F0F0F0;
+                border: 1px solid #444;
+            }
+            """
+            self.setStyleSheet(dark_stylesheet)
+        else:
+            self.setStyleSheet("")
 
     # --- Find dialog ---
     def show_find_dialog(self):
