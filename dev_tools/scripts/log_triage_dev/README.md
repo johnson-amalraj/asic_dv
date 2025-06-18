@@ -22,7 +22,7 @@ python3 new_ver.py
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# Features TODO (Need to update)
+# Features
 
 ## Log Folder Loading: 
 Load and parse multiple simulation and compile log files (simulate.log, compile.log, including .gz compressed files) from a selected directory.
