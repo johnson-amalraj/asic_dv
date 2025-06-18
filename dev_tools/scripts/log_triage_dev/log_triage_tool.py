@@ -6,14 +6,13 @@ import re
 import logging
 import traceback
 import psutil
-import itertools
 import matplotlib
 
 from collections import Counter, defaultdict
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QFileDialog, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
     QHBoxLayout, QLineEdit, QLabel, QProgressBar, QMenuBar, QMenu, QAction, QMessageBox,
-    QAbstractItemView, QHeaderView, QStatusBar, QDialog, QPushButton, QInputDialog, QMenu, QSizePolicy, QTextEdit, QGridLayout, QToolBar, 
+    QAbstractItemView, QHeaderView, QStatusBar, QDialog, QPushButton, QInputDialog, QMenu, QTextEdit, QToolBar, 
     QCheckBox, QWidgetAction
 )
 from PyQt5.QtCore import Qt, QSettings, QThread, pyqtSignal, QSize
@@ -184,25 +183,6 @@ class ChartDialog(QDialog):
                 QMessageBox.information(self, "Export", f"Chart exported to {path}")
             except Exception as e:
                 QMessageBox.critical(self, "Export Error", f"Failed to export chart:\n{e}")
-
-class ChartDialog(QDialog):
-    def __init__(self, fig, title="Chart", parent=None, filter_widgets=None, on_filter_change=None):
-        super().__init__(parent)
-        self.setWindowTitle(title)
-        self.resize(700, 500)
-        layout = QVBoxLayout(self)
-        self.canvas = FigureCanvas(fig)
-        layout.addWidget(self.canvas)
-        if filter_widgets:
-            filter_layout = QHBoxLayout()
-            for widget in filter_widgets:
-                filter_layout.addWidget(widget)
-                if on_filter_change:
-                    widget.currentIndexChanged.connect(on_filter_change)
-            layout.addLayout(filter_layout)
-        btn = QPushButton("Close", self)
-        btn.clicked.connect(self.accept)
-        layout.addWidget(btn)
 
 class ExclusionListDialog(QDialog):
     def __init__(self, exclusion_list, parent=None):
@@ -1014,8 +994,7 @@ class LogTriageWindow(QMainWindow):
                 f"High memory usage detected: {mem:.1f} MB.\n"
                 "Consider filtering or reducing the number of loaded files.")
 
-    def update_table(self):
-        self.table.setSortingEnabled(False)
+    def populate_table_rows(self):
         self.table.setRowCount(len(self.filtered_rows))
         for i, row in enumerate(self.filtered_rows):
             is_excluded = row[5] in self.exclusion_list  # Message column
@@ -1029,14 +1008,8 @@ class LogTriageWindow(QMainWindow):
                     item = QTableWidgetItem(comment)
                     item.setFlags(item.flags() | Qt.ItemIsEditable)
                 else:
-                    # Map j to the correct index in row (since row doesn't have Excluded/Comments)
-                    # Excluded is at index self.columns.index("Excluded")
-                    # Comments is at index self.columns.index("Comments")
                     excluded_idx = self.columns.index("Excluded")
                     comments_idx = self.columns.index("Comments")
-                    # For columns before Excluded, use j
-                    # For columns between Excluded and Comments, use j-1
-                    # For columns after Comments, shouldn't happen
                     if j < excluded_idx:
                         row_index = j
                     elif j < comments_idx:
@@ -1059,47 +1032,14 @@ class LogTriageWindow(QMainWindow):
                     item.setBackground(Qt.lightGray)
                 self.table.setItem(i, j, item)
         self.table.setColumnHidden(7, False)
-        self.table.setSortingEnabled(True)
-        if self.sort_order:
+        self.update_filter_row_geometry()
+
+    def update_table(self, sort=True):
+        self.table.setSortingEnabled(False)
+        self.populate_table_rows()
+        if sort and self.sort_order:
             self.sort_table_multi()
-        self.update_filter_row_geometry()
-    
-    def update_table_no_sort(self):
-        self.table.setRowCount(len(self.filtered_rows))
-        for i, row in enumerate(self.filtered_rows):
-            is_excluded = row[5] in self.exclusion_list
-            for j, col in enumerate(self.columns):
-                if col == "Excluded":
-                    item = QTableWidgetItem("Yes" if is_excluded else "No")
-                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                elif col == "Comments":
-                    row_key = tuple(row)
-                    comment = self.comments_dict.get(row_key, "")
-                    item = QTableWidgetItem(comment)
-                    item.setFlags(item.flags() | Qt.ItemIsEditable)
-                else:
-                    excluded_idx = self.columns.index("Excluded")
-                    comments_idx = self.columns.index("Comments")
-                    if j < excluded_idx:
-                        row_index = j
-                    elif j < comments_idx:
-                        row_index = j - 1
-                    else:
-                        continue
-                    item = QTableWidgetItem(str(row[row_index]))
-                    if row[3] == "ERROR":
-                        item.setForeground(Qt.red)
-                    elif row[3] == "FATAL":
-                        item.setForeground(Qt.magenta)
-                    elif row[3] == "WARNING":
-                        item.setForeground(Qt.darkYellow)
-                    if row_index in [2, 5, 7]:
-                        item.setToolTip(str(row[row_index]))
-                if is_excluded:
-                    item.setBackground(Qt.lightGray)
-                self.table.setItem(i, j, item)
-        self.table.setColumnHidden(7, False)
-        self.update_filter_row_geometry()
+        self.table.setSortingEnabled(True)
 
     # --- Multi-column sorting ---
     def handle_header_click(self, logicalIndex):
@@ -1124,7 +1064,7 @@ class LogTriageWindow(QMainWindow):
         def sort_key(row):
             return tuple(row[i] for i in valid_sort_order)
         self.filtered_rows.sort(key=sort_key)
-        self.update_table_no_sort()
+        self.update_table(sort=False)
 
     # --- Export ---
     def export_to_csv(self):
