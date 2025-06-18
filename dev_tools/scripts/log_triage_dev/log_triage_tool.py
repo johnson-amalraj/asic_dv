@@ -7,6 +7,8 @@ import logging
 import traceback
 import psutil
 import itertools
+import matplotlib
+
 from collections import Counter, defaultdict
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QFileDialog, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
@@ -15,6 +17,10 @@ from PyQt5.QtWidgets import (
     QCheckBox, QWidgetAction
 )
 from PyQt5.QtCore import Qt, QSettings, QThread, pyqtSignal, QSize
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+
+matplotlib.use('Qt5Agg')
 
 SETTINGS_ORG = "LogTriage"
 SETTINGS_APP = "LogTriageApp"
@@ -144,6 +150,59 @@ def get_memory_usage_mb():
     process = psutil.Process(os.getpid())
     mem = process.memory_info().rss / (1024 * 1024)
     return mem
+
+class ChartDialog(QDialog):
+    def __init__(self, fig, title="Chart", parent=None, filter_widgets=None, on_filter_change=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.resize(700, 500)
+        layout = QVBoxLayout(self)
+        self.canvas = FigureCanvas(fig)
+        layout.addWidget(self.canvas)
+        if filter_widgets:
+            filter_layout = QHBoxLayout()
+            for widget in filter_widgets:
+                filter_layout.addWidget(widget)
+                if on_filter_change:
+                    widget.currentIndexChanged.connect(on_filter_change)
+            layout.addLayout(filter_layout)
+        btn_layout = QHBoxLayout()
+        export_btn = QPushButton("Export as Image", self)
+        export_btn.clicked.connect(self.export_image)
+        btn_layout.addWidget(export_btn)
+        close_btn = QPushButton("Close", self)
+        close_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(close_btn)
+        layout.addLayout(btn_layout)
+
+    def export_image(self):
+        from PyQt5.QtWidgets import QFileDialog, QMessageBox
+        path, _ = QFileDialog.getSaveFileName(self, "Export Chart as Image", "", "PNG Files (*.png);;JPEG Files (*.jpg);;All Files (*)")
+        if path:
+            try:
+                self.canvas.figure.savefig(path)
+                QMessageBox.information(self, "Export", f"Chart exported to {path}")
+            except Exception as e:
+                QMessageBox.critical(self, "Export Error", f"Failed to export chart:\n{e}")
+
+class ChartDialog(QDialog):
+    def __init__(self, fig, title="Chart", parent=None, filter_widgets=None, on_filter_change=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.resize(700, 500)
+        layout = QVBoxLayout(self)
+        self.canvas = FigureCanvas(fig)
+        layout.addWidget(self.canvas)
+        if filter_widgets:
+            filter_layout = QHBoxLayout()
+            for widget in filter_widgets:
+                filter_layout.addWidget(widget)
+                if on_filter_change:
+                    widget.currentIndexChanged.connect(on_filter_change)
+            layout.addLayout(filter_layout)
+        btn = QPushButton("Close", self)
+        btn.clicked.connect(self.accept)
+        layout.addWidget(btn)
 
 class ExclusionListDialog(QDialog):
     def __init__(self, exclusion_list, parent=None):
@@ -517,6 +576,112 @@ class LogTriageWindow(QMainWindow):
         selected_rows = {item.row() for item in self.table.selectedItems()}
         self.statusbar.showMessage(f"{len(selected_rows)} row(s) selected.")
 
+    def show_pie_chart(self):
+        from matplotlib.figure import Figure
+        from PyQt5.QtWidgets import QComboBox
+    
+        testcases = sorted({row[1] for row in self.filtered_rows})
+        combo = QComboBox()
+        combo.addItem("All Test Cases")
+        combo.addItems(testcases)
+    
+        def plot_pie(ax):
+            selected_tc = combo.currentText()
+            stats = {"ERROR": 0, "FATAL": 0, "WARNING": 0}
+            for row in self.filtered_rows:
+                if selected_tc != "All Test Cases" and row[1] != selected_tc:
+                    continue
+                if row[3] in stats:
+                    stats[row[3]] += int(row[4])
+            labels = []
+            sizes = []
+            for typ in ["ERROR", "FATAL", "WARNING"]:
+                if stats[typ] > 0:
+                    labels.append(f"{typ} ({stats[typ]})")
+                    sizes.append(stats[typ])
+            if sizes:
+                ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=140, colors=['#e74c3c', '#8e44ad', '#f1c40f'])
+                ax.set_title("Distribution of Error Types")
+            else:
+                ax.text(0.5, 0.5, "No data", ha='center', va='center')
+    
+        fig = Figure(figsize=(5, 4))
+        ax = fig.add_subplot(111)
+        plot_pie(ax)
+    
+        def on_filter_change():
+            fig.clf()
+            ax = fig.add_subplot(111)
+            plot_pie(ax)
+            dialog.canvas.draw()
+    
+        dialog = ChartDialog(fig, "Pie Chart: Error Types", self, filter_widgets=[combo], on_filter_change=on_filter_change)
+        dialog.exec_()
+
+    def show_timeline_chart(self):
+        import datetime
+        # Try to extract timestamps from log file paths or messages
+        times = []
+        for row in self.filtered_rows:
+            # Example: extract YYYY-MM-DD HH:MM:SS from message or file path
+            m = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', row[5])
+            if not m:
+                m = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', row[7])
+            if m:
+                try:
+                    t = datetime.datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S")
+                    times.append((t, row[3]))  # (datetime, type)
+                except Exception:
+                    continue
+        if not times:
+            QMessageBox.information(self, "Timeline", "No timestamps found in log messages or file paths.")
+            return
+        # Group by type
+        types = ["ERROR", "FATAL", "WARNING"]
+        fig = Figure(figsize=(7, 4))
+        ax = fig.add_subplot(111)
+        for typ, color in zip(types, ['#e74c3c', '#8e44ad', '#f1c40f']):
+            tlist = [t[0] for t in times if t[1] == typ]
+            if tlist:
+                ax.hist(tlist, bins=30, alpha=0.7, label=typ, color=color)
+        ax.set_title("Timeline of Log Events")
+        ax.set_xlabel("Time")
+        ax.set_ylabel("Count")
+        ax.legend()
+        fig.autofmt_xdate()
+        dlg = ChartDialog(fig, "Timeline: Log Events", self)
+        dlg.exec_()
+
+    def show_heatmap_chart(self):
+        import numpy as np
+        # Build matrix: rows = test cases, cols = error types
+        testcases = sorted({row[1] for row in self.filtered_rows})
+        types = ["ERROR", "FATAL", "WARNING"]
+        data = np.zeros((len(testcases), len(types)), dtype=int)
+        tc_idx = {tc: i for i, tc in enumerate(testcases)}
+        typ_idx = {typ: i for i, typ in enumerate(types)}
+        for row in self.filtered_rows:
+            tc = row[1]
+            typ = row[3]
+            if tc in tc_idx and typ in typ_idx:
+                data[tc_idx[tc], typ_idx[typ]] += int(row[4])
+        if not np.any(data):
+            QMessageBox.information(self, "Heatmap", "No error/warning/fatal data to plot.")
+            return
+        fig = Figure(figsize=(8, 6))
+        ax = fig.add_subplot(111)
+        cax = ax.imshow(data, aspect='auto', cmap='hot')
+        ax.set_xticks(np.arange(len(types)))
+        ax.set_xticklabels(types)
+        ax.set_yticks(np.arange(len(testcases)))
+        ax.set_yticklabels(testcases)
+        ax.set_xlabel("Error Type")
+        ax.set_ylabel("Test Case")
+        fig.colorbar(cax, ax=ax, label="Count")
+        ax.set_title("Heatmap of Error Frequency by Test Case")
+        dlg = ChartDialog(fig, "Heatmap: Error Frequency", self)
+        dlg.exec_()
+
     def get_message_stats(self):
         """
         Returns a dict with total and unique counts for ERROR, FATAL, WARNING.
@@ -543,27 +708,27 @@ class LogTriageWindow(QMainWindow):
         # File menu
         file_menu = self.menu.addMenu("&File")
         load_action = QAction("Load Log Folder", self)
-        load_action.setShortcut("Ctrl+L")
+        load_action.setShortcut("Ctrl+O")  # Changed from Ctrl+L to Ctrl+O
         load_action.triggered.connect(self.load_log_folder)
         file_menu.addAction(load_action)
-
+    
         reload_action = QAction("Reload", self)
         reload_action.setShortcut("Ctrl+R")
         reload_action.triggered.connect(self.reload_last_folder)
         file_menu.addAction(reload_action)
-
+    
         export_action = QAction("Export to CSV", self)
         export_action.setShortcut("Ctrl+E")
         export_action.triggered.connect(self.export_to_csv)
         file_menu.addAction(export_action)
-
+    
         file_menu.addSeparator()
         recent_menu = QMenu("Recent Folders", self)
         self.recent_menu = recent_menu
         self.update_recent_menu()
         file_menu.addMenu(recent_menu)
         file_menu.addSeparator()
-
+    
         exit_action = QAction("Exit", self)
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(self.close)
@@ -575,13 +740,13 @@ class LogTriageWindow(QMainWindow):
         copy_row_action.setShortcut("Ctrl+C")
         copy_row_action.triggered.connect(self.copy_selected_rows)
         edit_menu.addAction(copy_row_action)
-
+    
         find_action = QAction("Find", self)
         find_action.setShortcut("Ctrl+F")
         find_action.triggered.connect(self.show_find_dialog)
         edit_menu.addAction(find_action)
     
-        # Add after other menus
+        # Columns menu
         columns_menu = self.menu.addMenu("&Columns")
         self.column_actions = []
         for i, col in enumerate(self.columns):
@@ -590,45 +755,46 @@ class LogTriageWindow(QMainWindow):
             act.triggered.connect(lambda checked, idx=i: self.toggle_column(idx, checked))
             columns_menu.addAction(act)
             self.column_actions.append(act)
-
+    
         # Exclusion menu
         exclusion_menu = self.menu.addMenu("&Exclusion")
         add_excl_action = QAction("Add to Exclusion", self)
         add_excl_action.setShortcut("Ctrl+X")
         add_excl_action.triggered.connect(self.add_to_exclusion)
         exclusion_menu.addAction(add_excl_action)
-
+    
         view_excl_action = QAction("View Exclusion List", self)
         view_excl_action.setShortcut("Ctrl+Shift+V")
         view_excl_action.triggered.connect(self.view_exclusion)
         exclusion_menu.addAction(view_excl_action)
-
+    
         export_excl_action = QAction("Export Exclusion List", self)
         export_excl_action.setShortcut("Ctrl+Shift+E")
         export_excl_action.triggered.connect(self.export_exclusion_list)
         exclusion_menu.addAction(export_excl_action)
-        
+    
         import_excl_action = QAction("Import Exclusion List", self)
         import_excl_action.setShortcut("Ctrl+Shift+I")
         import_excl_action.triggered.connect(self.import_exclusion_list)
         exclusion_menu.addAction(import_excl_action)
-
+    
         clear_excl_action = QAction("Clear Exclusion List", self)
         clear_excl_action.setShortcut("Ctrl+Shift+C")
         clear_excl_action.triggered.connect(self.clear_exclusion)
         exclusion_menu.addAction(clear_excl_action)
-
-        # In init_menus, after clear_excl_action
+    
         self.show_only_excluded_action = QAction("Show Only Excluded Rows", self, checkable=True)
+        self.show_only_excluded_action.setShortcut("Ctrl+Shift+X")
         self.show_only_excluded_action.setChecked(False)
         self.show_only_excluded_action.triggered.connect(self.toggle_show_only_excluded)
         exclusion_menu.addAction(self.show_only_excluded_action)
-        
+    
         self.show_only_nonexcluded_action = QAction("Show Only Non-Excluded Rows", self, checkable=True)
+        self.show_only_nonexcluded_action.setShortcut("Ctrl+Shift+N")
         self.show_only_nonexcluded_action.setChecked(False)
         self.show_only_nonexcluded_action.triggered.connect(self.toggle_show_only_nonexcluded)
         exclusion_menu.addAction(self.show_only_nonexcluded_action)
-
+    
         # Log menu
         log_menu = self.menu.addMenu("&Log")
         self.simulate_action = QAction("Show simulate.log", self, checkable=True)
@@ -636,45 +802,60 @@ class LogTriageWindow(QMainWindow):
         self.simulate_action.setShortcut("Ctrl+1")
         self.simulate_action.triggered.connect(self.toggle_simulate)
         log_menu.addAction(self.simulate_action)
-
+    
         self.compile_action = QAction("Show compile.log", self, checkable=True)
         self.compile_action.setChecked(True)
         self.compile_action.setShortcut("Ctrl+2")
         self.compile_action.triggered.connect(self.toggle_compile)
         log_menu.addAction(self.compile_action)
-
+    
         log_menu.addSeparator()
         self.scoreboard_action = QAction("Show Scoreboard Errors", self, checkable=True)
         self.scoreboard_action.setChecked(True)
         self.scoreboard_action.setShortcut("Ctrl+3")
         self.scoreboard_action.triggered.connect(self.toggle_scoreboard)
         log_menu.addAction(self.scoreboard_action)
-
+    
         # Summary menu
         summary_menu = self.menu.addMenu("&Summary")
         show_summary_action = QAction("Show Summary", self)
         show_summary_action.setShortcut("Ctrl+S")
         show_summary_action.triggered.connect(self.show_summary)
         summary_menu.addAction(show_summary_action)
-
-        # In Session menu
+    
+        # Session menu
         session_menu = self.menu.addMenu("&Session")
         save_session_action = QAction("Save Session", self)
         save_session_action.setShortcut("Ctrl+Shift+S")
         save_session_action.triggered.connect(self.save_session)
         session_menu.addAction(save_session_action)
-        
+    
         load_session_action = QAction("Load Session", self)
         load_session_action.setShortcut("Ctrl+Shift+O")
         load_session_action.triggered.connect(self.load_session)
         session_menu.addAction(load_session_action)
-
-        # Add Settings menu after Session
+    
+        # Settings menu
         settings_menu = self.menu.addMenu("&Settings")
         self.dark_mode_action = QAction("Dark Mode", self, checkable=True)
+        self.dark_mode_action.setShortcut("Ctrl+D")
         self.dark_mode_action.setChecked(False)
         self.dark_mode_action.triggered.connect(self.toggle_dark_mode)
         settings_menu.addAction(self.dark_mode_action)
+    
+        # Visualization menu
+        visual_menu = self.menu.addMenu("&Visualization")
+        pie_action = QAction("Pie Chart: Error Types", self)
+        pie_action.triggered.connect(self.show_pie_chart)
+        visual_menu.addAction(pie_action)
+        
+        timeline_action = QAction("Timeline: Log Events", self)
+        timeline_action.triggered.connect(self.show_timeline_chart)
+        visual_menu.addAction(timeline_action)
+        
+        heatmap_action = QAction("Heatmap: Error Frequency", self)
+        heatmap_action.triggered.connect(self.show_heatmap_chart)
+        visual_menu.addAction(heatmap_action)
 
         # Help menu
         help_menu = self.menu.addMenu("&Help")
@@ -682,12 +863,12 @@ class LogTriageWindow(QMainWindow):
         shortcut_action.setShortcut("F1")
         shortcut_action.triggered.connect(self.show_shortcuts)
         help_menu.addAction(shortcut_action)
-
+    
         features_action = QAction("Features", self)
         features_action.setShortcut("F2")
         features_action.triggered.connect(self.show_features)
         help_menu.addAction(features_action)
-
+    
         author_action = QAction("Author", self)
         author_action.setShortcut("F3")
         author_action.triggered.connect(self.show_author)
@@ -1118,20 +1299,23 @@ class LogTriageWindow(QMainWindow):
     def show_shortcuts(self):
         QMessageBox.information(self, "Shortcut Keys",
             "File Menu:\n"
-            "  Ctrl+L: Load Log Folder\n"
+            "  Ctrl+O: Load Log Folder\n"
             "  Ctrl+R: Reload\n"
             "  Ctrl+E: Export to CSV\n"
             "  Ctrl+Q: Exit\n"
             "\n"
             "Edit Menu:\n"
             "  Ctrl+C: Copy Selected Row(s)\n"
-            "  Ctrl+O: Open Log File\n"
             "  Ctrl+F: Find\n"
             "\n"
             "Exclusion Menu:\n"
             "  Ctrl+X: Add to Exclusion\n"
             "  Ctrl+Shift+V: View Exclusion List\n"
+            "  Ctrl+Shift+E: Export Exclusion List\n"
+            "  Ctrl+Shift+I: Import Exclusion List\n"
             "  Ctrl+Shift+C: Clear Exclusion List\n"
+            "  Ctrl+Shift+X: Show Only Excluded Rows\n"
+            "  Ctrl+Shift+N: Show Only Non-Excluded Rows\n"
             "\n"
             "Log Menu:\n"
             "  Ctrl+1: Show simulate.log\n"
@@ -1141,6 +1325,13 @@ class LogTriageWindow(QMainWindow):
             "Summary Menu:\n"
             "  Ctrl+S: Show Summary\n"
             "\n"
+            "Session Menu:\n"
+            "  Ctrl+Shift+S: Save Session\n"
+            "  Ctrl+Shift+O: Load Session\n"
+            "\n"
+            "Settings Menu:\n"
+            "  Ctrl+D: Dark Mode\n"
+            "\n"
             "Help Menu:\n"
             "  F1: Shortcut Keys\n"
             "  F2: Features\n"
@@ -1149,15 +1340,30 @@ class LogTriageWindow(QMainWindow):
 
     def show_features(self):
         QMessageBox.information(self, "Features",
-            "- Load and parse simulation/compile log files\n"
-            "- Filter, sort, and search log messages\n"
-            "- Exclude messages and manage exclusion list\n"
-            "- Export filtered data and summary to CSV\n"
-            "- View summary of errors/warnings/fatals\n"
-            "- Multi-column sorting and persistent settings\n"
-            # Add more features as needed
+            "- Load and parse simulation/compile log files (.log, .log.gz) from folders\n"
+            "- Tabular view of log messages with columns: ID, Test Case, Test Option, Type, Count, Message, Log Type, Log File Path, Excluded, Comments\n"
+            "- Per-column filtering (text, regex, numeric, exclusion status)\n"
+            "- Multi-column sorting (Shift+Click on headers)\n"
+            "- Find dialog with regex support and row highlighting\n"
+            "- Add messages to exclusion list; view, import, export, and clear exclusion list\n"
+            "- Visual indication for excluded rows; filter to show only excluded/non-excluded\n"
+            "- Per-row comments (editable, multi-line, persistent)\n"
+            "- Export filtered or selected rows to CSV\n"
+            "- Export summary table to CSV\n"
+            "- Save/load session (including comments and exclusions)\n"
+            "- Summary dialog: per-testcase/testopt counts for ERROR, FATAL, WARNING (total and unique)\n"
+            "- Pie chart, timeline, and heatmap visualizations of log events\n"
+            "- Export charts as images\n"
+            "- Dark mode toggle\n"
+            "- Keyboard shortcuts for all major actions (see Help > Shortcut Keys)\n"
+            "- Open log file in external editor (double-click row)\n"
+            "- Recent folders menu for quick access\n"
+            "- Progress bar and status messages for long operations\n"
+            "- Memory usage warning for large datasets\n"
+            "- Robust error handling and logging\n"
+            "- Help menu with shortcuts, features, and author info"
         )
-    
+
     def show_author(self):
         QMessageBox.information(self, "Author",
             "LogTriage Application\n"
