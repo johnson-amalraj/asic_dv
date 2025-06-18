@@ -85,12 +85,11 @@ python3 new_ver.py
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# TODO Feature Ideas to Consider
+## TODO Feature Ideas to Consider
 
-## Once all the features are added, Need to add the below features
-split the code into different files for re-usage
+Once all the features are added, Need to add the below features
+  split the code into different files for re-usage
 
-## Command Line Interface (CLI): 
-For users who prefer scripting or automation.
+Command Line Interface (CLI): For users who prefer scripting or automation.
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------
