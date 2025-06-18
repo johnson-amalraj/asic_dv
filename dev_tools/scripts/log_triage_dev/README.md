@@ -85,18 +85,13 @@ Remembers window size, position, column widths, and user preferences between ses
   
 # TODO Feature Ideas to Consider
 
-### Once all the features are added, Need to split the code into different files for re-usage
-### Need to add the clear features list
-
-## Visualization:
-Add basic charts (e.g., pie chart of error types, timeline of log events).
-Heatmap of error frequency over time or modules.
+## Once all the features are added, Need to add the below features
+check the shortcut keys
+update the feature list menu options and README.md also
+split the code into different files for re-usage
 
 ## Tagging System: 
 Allow users to tag log entries for categorization.
-
-## Auto-Triage Suggestions: 
-Use simple heuristics or ML to suggest likely causes or group similar issues.
 
 ## Integration Hooks: 
 Allow integration with bug tracking tools (e.g., JIRA) or CI/CD pipelines.
@@ -104,13 +99,11 @@ Allow integration with bug tracking tools (e.g., JIRA) or CI/CD pipelines.
 ## Command Line Interface (CLI): 
 For users who prefer scripting or automation.
 
-## Column Visibility: 
-Allow users to hide/show columns (e.g., log file path).
+## Auto-Triage Suggestions: 
+Use simple heuristics or ML to suggest likely causes or group similar issues.
 
-## Advanced Filtering: 
-Support AND/OR logic in filters, or allow users to save filter presets.
-
-## Log File Preview: 
-On double-click, show a preview of the log message in a dialog, with context lines.
+## Visualization:
+Add basic charts (e.g., pie chart of error types, timeline of log events).
+Heatmap of error frequency over time or modules.
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------
