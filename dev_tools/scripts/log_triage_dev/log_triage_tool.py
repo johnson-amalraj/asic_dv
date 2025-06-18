@@ -122,30 +122,53 @@ def extract_log_info(filepath):
     return (id_val, testcase, testopt)
 
 def group_rows(rows):
-    grouped = defaultdict(lambda: [None, None, set(), None, 0, None, None, None, None])
+    # Group by (Test Case, Test Option, Type, Message, Log Type)
+    grouped = defaultdict(lambda: [None, None, None, None, 0, None, None, None, None])
     for row in rows:
-        # Key: (Test Case, Message, Type, Log Type, Log File Path)
-        key = (row[1], row[5], row[3], row[6], row[7])
+        # Key: (Test Case, Test Option, Type, Message, Log Type)
+        key = (row[1], row[2], row[3], row[5], row[6])
         if grouped[key][0] is None:
             grouped[key][0] = row[0]  # ID (first one)
             grouped[key][1] = row[1]  # Test Case
+            grouped[key][2] = row[2]  # Test Option
             grouped[key][3] = row[3]  # Type
+            grouped[key][4] = 0       # Count (sum)
             grouped[key][5] = row[5]  # Message
             grouped[key][6] = row[6]  # Log Type
             grouped[key][7] = row[7]  # Log File Path
-        grouped[key][2].add(row[2])  # Test Option (collect all)
+            grouped[key][8] = row[8] if len(row) > 8 else ""  # Comments, if present
         grouped[key][4] += int(row[4])  # Sum Count
-    # Convert set of TestOptions to comma-separated string
-    result = []
-    for v in grouped.values():
-        v[2] = ",".join(sorted(v[2]))
-        result.append(v)
-    return result
+    return list(grouped.values())
 
 def get_memory_usage_mb():
     process = psutil.Process(os.getpid())
     mem = process.memory_info().rss / (1024 * 1024)
     return mem
+
+class ExclusionListDialog(QDialog):
+    def __init__(self, exclusion_list, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Exclusion List")
+        self.resize(600, 400)
+        layout = QVBoxLayout(self)
+
+        # Add count label
+        count_label = QLabel(f"Total excluded messages: {len(exclusion_list)}")
+        layout.addWidget(count_label)
+
+        self.table = QTableWidget(len(exclusion_list), 1)
+        self.table.setHorizontalHeaderLabels(["Excluded Message"])
+        self.table.verticalHeader().setVisible(False)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        for i, msg in enumerate(sorted(exclusion_list)):
+            item = QTableWidgetItem(msg)
+            self.table.setItem(i, 0, item)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        layout.addWidget(self.table)
+
+        btn = QPushButton("Close", self)
+        btn.clicked.connect(self.accept)
+        layout.addWidget(btn)
 
 class FindDialog(QDialog):
     def __init__(self, parent, table, columns):
@@ -234,7 +257,7 @@ class SummaryDialog(QDialog):
         self.statusbar = statusbar
         layout = QVBoxLayout(self)
         # 8 columns: Testcase, TestOpt, ERROR, ERROR(unique), FATAL, FATAL(unique), WARNING, WARNING(unique)
-        headers = ["Testcase", "TestOpt", "ERROR", "ERROR (unique)", "FATAL", "FATAL (unique)", "WARNING", "WARNING (unique)"]
+        headers = ["Test Case", "Test Option", "ERROR", "ERROR (unique)", "FATAL", "FATAL (unique)", "WARNING", "WARNING (unique)"]
         self.table = QTableWidget(len(summary_rows), len(headers))
         self.table.setHorizontalHeaderLabels(headers)
         for i, row in enumerate(summary_rows):
@@ -291,8 +314,8 @@ class LogTriageWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.comments_dict = {}  # {row_key: comment}
-        self.setWindowTitle("Log Triage v3.0 (PyQt5)")
-        self.columns = ["ID", "Test Case", "Test Option", "Type", "Count", "Message", "Log Type", "Log File Path", "Comments"]
+        self.setWindowTitle("Log Triage v4.0")
+        self.columns = ["ID", "Test Case", "Test Option", "Type", "Count", "Message", "Log Type", "Log File Path", "Excluded", "Comments"]
         self.settings = QSettings("LogTriage", "LogTriageApp")
         self.all_rows = []
         self.filtered_rows = []
@@ -305,6 +328,8 @@ class LogTriageWindow(QMainWindow):
         self.init_ui()
         self.restore_settings()
         self.exclusion_list = set()
+        self.show_only_excluded = False
+        self.show_only_nonexcluded = False
 
     def init_ui(self):
         default_colwidths = [100, 250, 300, 200, 80, 400, 80, 500, 100]
@@ -326,9 +351,12 @@ class LogTriageWindow(QMainWindow):
         self.table.horizontalHeader().sectionResized.connect(self.update_filter_row_geometry)
         self.table.horizontalHeader().sectionMoved.connect(self.update_filter_row_geometry)
         self.table.horizontalScrollBar().valueChanged.connect(self.update_filter_row_geometry)
-        self.table.verticalScrollBar().valueChanged.connect(self.update_filter_row_geometry)
         self.table.viewport().installEventFilter(self)
+        self.table.verticalScrollBar().valueChanged.connect(self.update_filter_row_geometry)
+        self.table.verticalHeader().setVisible(False)
+        self.table.horizontalHeader().geometriesChanged.connect(self.update_filter_row_geometry)  # Add this if available
         self.table.itemChanged.connect(self.handle_comment_edit)
+        self.table.itemSelectionChanged.connect(self.update_selection_status)
 
         # --- Filter row widget (floating, below header) ---
         self.filter_row_widget = QWidget()
@@ -358,7 +386,7 @@ class LogTriageWindow(QMainWindow):
 
         # Folder path label (above progress bar)
         self.folder_status_label = QLabel("")
-        self.folder_status_label.setStyleSheet("font-size: 10pt; color: #333;")
+        self.folder_status_label.setStyleSheet("font-size: 10pt;")
         vbox.addWidget(self.folder_status_label)
 
         # Progress bar (below folder path label)
@@ -469,6 +497,26 @@ class LogTriageWindow(QMainWindow):
             # Store the entire comment (multi-line)
             self.comments_dict[row_key] = item.text()
 
+    def toggle_show_only_excluded(self):
+        self.show_only_excluded = self.show_only_excluded_action.isChecked()
+        if self.show_only_excluded:
+            # Uncheck the other action
+            self.show_only_nonexcluded = False
+            self.show_only_nonexcluded_action.setChecked(False)
+        self.apply_filters()
+    
+    def toggle_show_only_nonexcluded(self):
+        self.show_only_nonexcluded = self.show_only_nonexcluded_action.isChecked()
+        if self.show_only_nonexcluded:
+            # Uncheck the other action
+            self.show_only_excluded = False
+            self.show_only_excluded_action.setChecked(False)
+        self.apply_filters()
+
+    def update_selection_status(self):
+        selected_rows = {item.row() for item in self.table.selectedItems()}
+        self.statusbar.showMessage(f"{len(selected_rows)} row(s) selected.")
+
     def get_message_stats(self):
         """
         Returns a dict with total and unique counts for ERROR, FATAL, WARNING.
@@ -533,6 +581,16 @@ class LogTriageWindow(QMainWindow):
         find_action.triggered.connect(self.show_find_dialog)
         edit_menu.addAction(find_action)
     
+        # Add after other menus
+        columns_menu = self.menu.addMenu("&Columns")
+        self.column_actions = []
+        for i, col in enumerate(self.columns):
+            act = QAction(col, self, checkable=True)
+            act.setChecked(True)
+            act.triggered.connect(lambda checked, idx=i: self.toggle_column(idx, checked))
+            columns_menu.addAction(act)
+            self.column_actions.append(act)
+
         # Exclusion menu
         exclusion_menu = self.menu.addMenu("&Exclusion")
         add_excl_action = QAction("Add to Exclusion", self)
@@ -559,6 +617,17 @@ class LogTriageWindow(QMainWindow):
         clear_excl_action.setShortcut("Ctrl+Shift+C")
         clear_excl_action.triggered.connect(self.clear_exclusion)
         exclusion_menu.addAction(clear_excl_action)
+
+        # In init_menus, after clear_excl_action
+        self.show_only_excluded_action = QAction("Show Only Excluded Rows", self, checkable=True)
+        self.show_only_excluded_action.setChecked(False)
+        self.show_only_excluded_action.triggered.connect(self.toggle_show_only_excluded)
+        exclusion_menu.addAction(self.show_only_excluded_action)
+        
+        self.show_only_nonexcluded_action = QAction("Show Only Non-Excluded Rows", self, checkable=True)
+        self.show_only_nonexcluded_action.setChecked(False)
+        self.show_only_nonexcluded_action.triggered.connect(self.toggle_show_only_nonexcluded)
+        exclusion_menu.addAction(self.show_only_nonexcluded_action)
 
         # Log menu
         log_menu = self.menu.addMenu("&Log")
@@ -648,6 +717,8 @@ class LogTriageWindow(QMainWindow):
             return
         self.loaded_folder = folder
         self.settings.setValue(LAST_FOLDER_KEY, folder)
+        self.save_recent_folders(folder)
+        self.update_recent_menu()
         QApplication.processEvents()
         # Find log files
         log_files = []
@@ -656,6 +727,14 @@ class LogTriageWindow(QMainWindow):
                 if (self.show_simulate and fname.startswith("simulate.log")) or (self.show_compile and fname.startswith("compile.log")):
                     if fname.endswith(".log") or fname.endswith(".log.gz"):
                         log_files.append(os.path.join(root, fname))
+        # --- Add this block ---
+        if not log_files:
+            self.statusbar.showMessage("No valid log files found in the selected folder.")
+            self.progress.setMaximum(1)
+            self.progress.setValue(1)
+            self.progress.setFormat("No log files found.")
+            return
+        # ----------------------
         self.progress.setMaximum(len(log_files))
         self.progress.setValue(0)
         self.progress.setFormat(f"Loading 0/{len(log_files)} files...")
@@ -696,21 +775,51 @@ class LogTriageWindow(QMainWindow):
             for i, f in enumerate(filters):
                 if not f:
                     continue
-                if self.columns[i] == "Count":
-                    if not parse_count_filter(f, row[i]):
+                col_name = self.columns[i]
+                if col_name == "Count":
+                    if not parse_count_filter(f, row[self.columns.index("Count")]):
                         match = False
                         break
+                elif col_name == "Excluded":
+                    is_excluded = row[5] in self.exclusion_list
+                    if (f in ["yes", "y", "1", "true"] and not is_excluded) or (f in ["no", "n", "0", "false"] and is_excluded):
+                        match = False
+                        break
+                    # If filter is not a recognized value, do substring match
+                    if f not in ["yes", "y", "1", "true", "no", "n", "0", "false"]:
+                        if (f not in ("yes" if is_excluded else "no")):
+                            match = False
+                            break
                 else:
-                    if f not in str(row[i]).lower():
+                    # Map i to the correct index in row (since row doesn't have Excluded/Comments)
+                    excluded_idx = self.columns.index("Excluded")
+                    comments_idx = self.columns.index("Comments")
+                    if i < excluded_idx:
+                        row_index = i
+                    elif i < comments_idx:
+                        row_index = i - 1
+                    else:
+                        continue
+                    if f not in str(row[row_index]).lower():
                         match = False
                         break
             if not match:
                 continue
+    
+            # --- Exclusion filter logic (NEW) ---
+            is_excluded = row[5] in self.exclusion_list
+            if self.show_only_excluded and not is_excluded:
+                continue
+            if self.show_only_nonexcluded and is_excluded:
+                continue
+            # -------------------------------------
+    
             # Only filter scoreboard errors here
             if not self.show_scoreboard and "sbd_compare" in str(row[5]).lower():
                 continue
             self.filtered_rows.append(row)
         self.update_table()
+        unique_rows = {tuple(row) for row in self.filtered_rows}
         stats = self.get_message_stats()
         mem = get_memory_usage_mb()
         self.statusbar.showMessage(
@@ -724,37 +833,92 @@ class LogTriageWindow(QMainWindow):
                 f"High memory usage detected: {mem:.1f} MB.\n"
                 "Consider filtering or reducing the number of loaded files.")
 
-        self.update_filter_row_geometry()
-
     def update_table(self):
-        self.table.setSortingEnabled(False)  # Disable sorting while populating
+        self.table.setSortingEnabled(False)
         self.table.setRowCount(len(self.filtered_rows))
         for i, row in enumerate(self.filtered_rows):
             is_excluded = row[5] in self.exclusion_list  # Message column
-            for j, val in enumerate(row):
-                if j == len(self.columns) - 1:  # Comments column
-                    row_key = tuple(row[:-1])  # Exclude Comments column
+            for j, col in enumerate(self.columns):
+                if col == "Excluded":
+                    item = QTableWidgetItem("Yes" if is_excluded else "No")
+                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Read-only
+                elif col == "Comments":
+                    row_key = tuple(row)  # row does not include Excluded or Comments
                     comment = self.comments_dict.get(row_key, "")
                     item = QTableWidgetItem(comment)
                     item.setFlags(item.flags() | Qt.ItemIsEditable)
                 else:
-                    item = QTableWidgetItem(str(val))
+                    # Map j to the correct index in row (since row doesn't have Excluded/Comments)
+                    # Excluded is at index self.columns.index("Excluded")
+                    # Comments is at index self.columns.index("Comments")
+                    excluded_idx = self.columns.index("Excluded")
+                    comments_idx = self.columns.index("Comments")
+                    # For columns before Excluded, use j
+                    # For columns between Excluded and Comments, use j-1
+                    # For columns after Comments, shouldn't happen
+                    if j < excluded_idx:
+                        row_index = j
+                    elif j < comments_idx:
+                        row_index = j - 1
+                    else:
+                        continue  # Should not happen
+                    item = QTableWidgetItem(str(row[row_index]))
+                    # Color coding
                     if row[3] == "ERROR":
                         item.setForeground(Qt.red)
                     elif row[3] == "FATAL":
                         item.setForeground(Qt.magenta)
                     elif row[3] == "WARNING":
                         item.setForeground(Qt.darkYellow)
-                    if j == 5:
-                        item.setToolTip(str(val))
-                # --- Grey out excluded rows ---
+                    # Tooltips
+                    if row_index in [2, 5, 7]:  # Test Option, Message, Log File Path
+                        item.setToolTip(str(row[row_index]))
+                # Grey out excluded rows
                 if is_excluded:
                     item.setBackground(Qt.lightGray)
                 self.table.setItem(i, j, item)
         self.table.setColumnHidden(7, False)
-        self.table.setSortingEnabled(True)  # Re-enable sorting after populating
+        self.table.setSortingEnabled(True)
         if self.sort_order:
             self.sort_table_multi()
+        self.update_filter_row_geometry()
+    
+    def update_table_no_sort(self):
+        self.table.setRowCount(len(self.filtered_rows))
+        for i, row in enumerate(self.filtered_rows):
+            is_excluded = row[5] in self.exclusion_list
+            for j, col in enumerate(self.columns):
+                if col == "Excluded":
+                    item = QTableWidgetItem("Yes" if is_excluded else "No")
+                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                elif col == "Comments":
+                    row_key = tuple(row)
+                    comment = self.comments_dict.get(row_key, "")
+                    item = QTableWidgetItem(comment)
+                    item.setFlags(item.flags() | Qt.ItemIsEditable)
+                else:
+                    excluded_idx = self.columns.index("Excluded")
+                    comments_idx = self.columns.index("Comments")
+                    if j < excluded_idx:
+                        row_index = j
+                    elif j < comments_idx:
+                        row_index = j - 1
+                    else:
+                        continue
+                    item = QTableWidgetItem(str(row[row_index]))
+                    if row[3] == "ERROR":
+                        item.setForeground(Qt.red)
+                    elif row[3] == "FATAL":
+                        item.setForeground(Qt.magenta)
+                    elif row[3] == "WARNING":
+                        item.setForeground(Qt.darkYellow)
+                    if row_index in [2, 5, 7]:
+                        item.setToolTip(str(row[row_index]))
+                if is_excluded:
+                    item.setBackground(Qt.lightGray)
+                self.table.setItem(i, j, item)
+        self.table.setColumnHidden(7, False)
+        self.update_filter_row_geometry()
 
     # --- Multi-column sorting ---
     def handle_header_click(self, logicalIndex):
@@ -781,47 +945,72 @@ class LogTriageWindow(QMainWindow):
         self.filtered_rows.sort(key=sort_key)
         self.update_table_no_sort()
 
-    def update_table_no_sort(self):
-        self.table.setRowCount(len(self.filtered_rows))
-        for i, row in enumerate(self.filtered_rows):
-            is_excluded = row[5] in self.exclusion_list  # Message column
-            for j, val in enumerate(row):
-                item = QTableWidgetItem(str(val))
-                if row[3] == "ERROR":
-                    item.setForeground(Qt.red)
-                elif row[3] == "FATAL":
-                    item.setForeground(Qt.magenta)
-                elif row[3] == "WARNING":
-                    item.setForeground(Qt.darkYellow)
-                if j == 5:
-                    item.setToolTip(str(val))
-                # --- Grey out excluded rows ---
-                if is_excluded:
-                    item.setBackground(Qt.lightGray)
-                self.table.setItem(i, j, item)
-        # self.table.resizeColumnsToContents()
-        self.table.setColumnHidden(7, False)
-        self.update_filter_row_geometry()
-
     # --- Export ---
     def export_to_csv(self):
-        if not self.filtered_rows:
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Export to CSV")
+        msg_box.setText("Export which data to CSV?")
+        all_btn = msg_box.addButton("All Rows", QMessageBox.AcceptRole)
+        sel_btn = msg_box.addButton("Selected Rows", QMessageBox.AcceptRole)
+        cancel_btn = msg_box.addButton(QMessageBox.Cancel)
+        msg_box.setDefaultButton(all_btn)
+        msg_box.exec_()
+    
+        if msg_box.clickedButton() == cancel_btn:
+            return
+        elif msg_box.clickedButton() == sel_btn:
+            export_type = "selected"
+        else:
+            export_type = "all"
+    
+        export_columns = self.columns
+    
+        export_rows = []
+        if export_type == "selected":
+            selected = self.table.selectedItems()
+            if not selected:
+                QMessageBox.warning(self, "Export", "No rows selected.")
+                return
+            rows = {}
+            for item in selected:
+                row = item.row()
+                if row not in rows:
+                    # Build the row from the table, including Excluded and Comments
+                    row_data = []
+                    for col in range(self.table.columnCount()):
+                        cell = self.table.item(row, col)
+                        row_data.append(cell.text() if cell else "")
+                    rows[row] = row_data
+            export_rows = list(rows.values())
+        else:
+            for row in self.filtered_rows:
+                is_excluded = row[5] in self.exclusion_list
+                row_key = tuple(row)
+                comment = self.comments_dict.get(row_key, "")
+                # Compose the row with Excluded and Comments
+                row_with_excl = list(row) + [("Yes" if is_excluded else "No"), comment]
+                export_rows.append(row_with_excl)
+    
+        if not export_rows:
             QMessageBox.warning(self, "Export", "No data to export.")
             return
+    
         path, _ = QFileDialog.getSaveFileName(self, "Export to CSV", os.getcwd(), "CSV Files (*.csv)")
         if not path or not path.strip():
             return
         path = path.strip()
         try:
-            export_columns = self.columns
             with open(path, "w", newline='', encoding="utf-8") as f:
                 writer = csv.writer(f)
                 writer.writerow(export_columns)
-                for row in self.filtered_rows:
-                    row_key = tuple(row[:-1])
-                    comment = self.comments_dict.get(row_key, "")
-                    writer.writerow(list(row[:-1]) + [comment])
-            self.statusbar.showMessage(f"Exported {len(self.filtered_rows)} rows to {path}")
+                for row in export_rows:
+                    writer.writerow(row)
+            self.statusbar.showMessage(f"Exported {len(export_rows)} {export_type} rows to {path}")
+            excluded_count = sum(1 for row in export_rows if row[self.columns.index("Excluded")] == "Yes")
+            QMessageBox.information(self, "Export Info",
+                f"Exported {len(export_rows)} {export_type} rows to {path}\n"
+                f"Unique rows: {len({tuple(row) for row in export_rows})}\n"
+                f"Excluded rows in export: {excluded_count}")
         except Exception as e:
             self.statusbar.showMessage(f"Failed to export: {e}")
             QMessageBox.critical(self, "Export Error", f"Failed to export:\n{e}")
@@ -842,8 +1031,8 @@ class LogTriageWindow(QMainWindow):
         self.statusbar.showMessage(f"Added {len(rows)} messages to exclusion list.")
 
     def view_exclusion(self):
-        msg = "\n\n".join(sorted(self.exclusion_list)) or "(No exclusions)"
-        QMessageBox.information(self, "Exclusion List", msg)
+        dlg = ExclusionListDialog(self.exclusion_list, self)
+        dlg.exec_()
 
     def export_exclusion_list(self):
         path, _ = QFileDialog.getSaveFileName(self, "Export Exclusion List", os.getcwd(), "CSV Files (*.csv)")
@@ -989,6 +1178,10 @@ class LogTriageWindow(QMainWindow):
         QApplication.clipboard().setText(text)
         self.statusbar.showMessage("Copied selected row(s) to clipboard.")
 
+    def toggle_column(self, col_index, checked):
+        self.table.setColumnHidden(col_index, not checked)
+        self.update_filter_row_geometry()
+
     def open_log_file(self, index):
         row = index.row()
         filepath = self.table.item(row, 7).text()
@@ -1025,7 +1218,6 @@ class LogTriageWindow(QMainWindow):
         self.apply_filters()
 
     def save_session(self):
-        # --- Fix: Commit any in-progress edits ---
         default_dir = os.getcwd()
         comments_col = self.columns.index("Comments")
         for row in range(self.table.rowCount()):
@@ -1034,8 +1226,6 @@ class LogTriageWindow(QMainWindow):
                 self.table.closePersistentEditor(item)
         self.table.clearFocus()
         QApplication.processEvents()
-    
-        # --- Fix: Update comments_dict from table ---
         self.update_comments_dict_from_table()
     
         path, _ = QFileDialog.getSaveFileName(self, "Save Session", default_dir, "CSV Files (*.csv)")
@@ -1046,7 +1236,9 @@ class LogTriageWindow(QMainWindow):
                 f.write("# LogTriage Session File v1\n")
                 f.write("[ROWS]\n")
                 writer = csv.writer(f)
-                writer.writerow(self.columns)
+                # Save all rows (without Excluded and Comments, as Excluded is derived and Comments is separate)
+                data_columns = [col for col in self.columns if col not in ("Excluded", "Comments")]
+                writer.writerow(data_columns)
                 for row in self.filtered_rows:
                     writer.writerow(row)
                 f.write("[COMMENTS]\n")
@@ -1077,53 +1269,47 @@ class LogTriageWindow(QMainWindow):
         if not path:
             return
         try:
-            # Show loading message in progress bar
             self.progress.setFormat("Loading session file...")
-            self.progress.setMaximum(0)  # Indeterminate
+            self.progress.setMaximum(0)
             self.progress.setValue(0)
+            self.save_recent_folders(os.path.dirname(path))
+            self.update_recent_menu()
             QApplication.processEvents()
-
+    
             with open(path, "r", encoding="utf-8") as f:
-                # Read up to [ROWS]
                 for line in f:
                     if line.strip() == "[ROWS]":
                         break
-                # Read header
                 header = next(csv.reader([f.readline()]))
-                # Read rows until next section
                 rows = []
                 for row in csv.reader(f):
                     if row and row[0].startswith("["):
-                        # We've hit the next section header
                         section_header = row[0]
                         break
                     rows.append(row)
                 else:
-                    section_header = None  # EOF
+                    section_header = None
     
-                # If next section is [COMMENTS], read comments
                 comments_dict = {}
                 if section_header == "[COMMENTS]":
                     for row in csv.reader(f):
                         if row and row[0].startswith("["):
                             section_header = row[0]
                             break
-                        if len(row) < len(self.columns):
+                        if len(row) < len(self.columns) - 2:  # Excluded and Comments not in data
                             continue
-                        row_key = tuple(row[:len(self.columns)-1])
-                        comment = row[len(self.columns)-1]
+                        row_key = tuple(row[:len(self.columns)-2])
+                        comment = row[len(self.columns)-2]
                         comments_dict[row_key] = comment
                 else:
                     comments_dict = {}
     
-                # If next section is [EXCLUSIONS], read exclusions
                 exclusion_list = set()
                 if section_header == "[EXCLUSIONS]":
                     for row in csv.reader(f):
                         if row and not row[0].startswith("["):
                             exclusion_list.add(row[0])
     
-            # Restore state
             self.all_rows = rows
             self.comments_dict = comments_dict
             self.exclusion_list = exclusion_list
@@ -1139,8 +1325,7 @@ class LogTriageWindow(QMainWindow):
                 f"FATAL: {stats['FATAL']['total']} ({stats['FATAL']['unique']} unique), "
                 f"WARNING: {stats['WARNING']['total']} ({stats['WARNING']['unique']} unique)"
             )
-
-            # After loading is done
+    
             self.progress.setMaximum(1)
             self.progress.setValue(1)
             self.progress.setFormat("Session loaded.")
@@ -1175,9 +1360,25 @@ class LogTriageWindow(QMainWindow):
                 color: #F0F0F0;
                 border-bottom: 1px solid #444;
             }
-            QMenuBar, QMenu, QStatusBar {
+            QMenuBar, QMenu {
                 background-color: #232629;
                 color: #F0F0F0;
+            }
+            QMenuBar::item:selected {
+                background: #0078d7;   /* A bright blue, or pick your own */
+                color: #ffffff;
+            }
+            QMenu::item:selected {
+                background: #0078d7;   /* Same blue as above */
+                color: #ffffff;
+            }
+            QStatusBar {
+                background-color: #232629;
+                color: #F0F0F0;
+            }
+            QLabel {
+                color: #F0F0F0;
+                background: transparent;
             }
             QProgressBar {
                 background-color: #31363b;
@@ -1245,7 +1446,7 @@ class LogParseWorker(QThread):
 
 if __name__ == "__main__":
     logging.basicConfig(
-        filename='logtriage_error.log',
+        filename='tool_error.log',
         level=logging.ERROR,
         format='%(asctime)s %(levelname)s: %(message)s'
     )
@@ -1256,7 +1457,7 @@ if __name__ == "__main__":
         from PyQt5.QtWidgets import QMessageBox
         QMessageBox.critical(None, "Unexpected Error",
             "An unexpected error occurred:\n\n" + str(value) +
-            "\n\nSee logtriage_error.log for details.")
+            "\n\nSee tool_error.log for details.")
 
     sys.excepthook = log_uncaught_exceptions
 
