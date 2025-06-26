@@ -1024,7 +1024,7 @@ class LogTriageWindow(QMainWindow):
             f"FATAL: {stats['FATAL']['total']} ({stats['FATAL']['unique']} unique), "
             f"WARNING: {stats['WARNING']['total']} ({stats['WARNING']['unique']} unique)"
         )
-        if mem > 500:
+        if mem > 1000:
             QMessageBox.warning(self, "Memory Usage Warning",
                 f"High memory usage detected: {mem:.1f} MB.\n"
                 "Consider filtering or reducing the number of loaded files.")
