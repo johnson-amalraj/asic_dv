@@ -73,34 +73,69 @@ def open_log_file_anytype(filepath):
     else:
         return open(filepath, 'r', encoding='utf-8', errors='ignore')
 
-def parse_log_file(filepath, max_lines=100000):
-    error_pattern = re.compile(r'UVM_ERROR')
-    warning_pattern = re.compile(r'UVM_WARNING')
-    star_e_pattern = re.compile(r'^\*E')
-    star_f_pattern = re.compile(r'^\*F')
-    dash_e_pattern = re.compile(r'^-E-')
-    dash_f_pattern = re.compile(r'^-F-')
+def parse_log_file(filepath):
+    """
+    Parse a log file and extract error, fatal, and warning messages from
+    VCS, Questa, Xcelium, UVM, xmelab, and -E-/F-/W- formats.
+    """
+    patterns = [
+        # UVM
+        ('ERROR',   re.compile(r'UVM_ERROR'),   r'^.*UVM_ERROR\s*:? ?'),
+        ('WARNING', re.compile(r'UVM_WARNING'), r'^.*UVM_WARNING\s*:? ?'),
+        ('FATAL',   re.compile(r'UVM_FATAL'),   r'^.*UVM_FATAL\s*:? ?'),
+
+        # Questa/ModelSim
+        ('ERROR',   re.compile(r'^\*\* Error:'),   r'^\*\* Error:\s*'),
+        ('WARNING', re.compile(r'^\*\* Warning:'), r'^\*\* Warning:\s*'),
+        ('FATAL',   re.compile(r'^\*\* Fatal:'),   r'^\*\* Fatal:\s*'),
+
+        # VCS
+        ('ERROR',   re.compile(r'^Error-$$.*?$$'),   r'^Error-$$.*?$$\s*'),
+        ('WARNING', re.compile(r'^Warning-$$.*?$$'), r'^Warning-$$.*?$$\s*'),
+        ('FATAL',   re.compile(r'^Fatal:'),          r'^Fatal:\s*'),
+
+        # Xcelium (ncvlog/ncsim)
+        ('ERROR',   re.compile(r'ncvlog: \*E,'),   r'^.*ncvlog: \*E,[^:]*:?\s*'),
+        ('WARNING', re.compile(r'ncvlog: \*W,'),   r'^.*ncvlog: \*W,[^:]*:?\s*'),
+        ('FATAL',   re.compile(r'ncsim: \*F,'),    r'^.*ncsim: \*F,[^:]*:?\s*'),
+
+        # xmelab
+        ('ERROR',   re.compile(r'xmelab: \*E,'),   r'^.*xmelab: \*E,[^:]*:?\s*'),
+        ('WARNING', re.compile(r'xmelab: \*W,'),   r'^.*xmelab: \*W,[^:]*:?\s*'),
+
+        # -E-, -F-, -W- patterns
+        ('ERROR',   re.compile(r'^-E-'), r'^-E-\s*'),
+        ('FATAL',   re.compile(r'^-F-'), r'^-F-\s*'),
+        ('WARNING', re.compile(r'^-W-'), r'^-W-\s*'),
+
+        # *E, *F, *W patterns (sometimes used)
+        ('ERROR',   re.compile(r'^\*E'), r'^\*E\s*'),
+        ('FATAL',   re.compile(r'^\*F'), r'^\*F\s*'),
+        ('WARNING', re.compile(r'^\*W'), r'^\*W\s*'),
+
+        # Generic (case-insensitive, less specific, so last)
+        ('ERROR',   re.compile(r'\bError\b', re.IGNORECASE),   r'^.*Error\s*:? ?'),
+        ('WARNING', re.compile(r'\bWarning\b', re.IGNORECASE), r'^.*Warning\s*:? ?'),
+        ('FATAL',   re.compile(r'\bFatal\b', re.IGNORECASE),   r'^.*Fatal\s*:? ?'),
+    ]
+
     errors, fatals, warnings = [], [], []
 
     with open_log_file_anytype(filepath) as f:
         for line in f:
             line_stripped = line.strip()
-            if error_pattern.search(line):
-                msg = re.sub(r'^.*UVM_ERROR\s*:? ?', '', line_stripped)
-                msg = clean_message(msg)
-                errors.append(msg)
-            elif warning_pattern.search(line):
-                msg = re.sub(r'^.*UVM_WARNING\s*:? ?', '', line_stripped)
-                msg = clean_message(msg)
-                warnings.append(msg)
-            elif star_e_pattern.match(line_stripped) or dash_e_pattern.match(line_stripped):
-                msg = re.sub(r'^(\*E|-E-)\s*', '', line_stripped)
-                msg = clean_message(msg)
-                errors.append(msg)
-            elif star_f_pattern.match(line_stripped) or dash_f_pattern.match(line_stripped):
-                msg = re.sub(r'^(\*F|-F-)\s*', '', line_stripped)
-                msg = clean_message(msg)
-                fatals.append(msg)
+            for typ, pat, prefix in patterns:
+                if pat.search(line_stripped):
+                    msg = re.sub(prefix, '', line_stripped)
+                    msg = clean_message(msg)
+                    if typ == 'ERROR':
+                        errors.append(msg)
+                    elif typ == 'WARNING':
+                        warnings.append(msg)
+                    elif typ == 'FATAL':
+                        fatals.append(msg)
+                    break  # Only match the first pattern per line
+
     error_counts = Counter(errors)
     fatal_counts = Counter(fatals)
     warning_counts = Counter(warnings)
@@ -353,7 +388,7 @@ class LogTriageWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.comments_dict = {}  # {row_key: comment}
-        self.setWindowTitle("Log Triage v4.0")
+        self.setWindowTitle("Log Triage v5.0")
         self.columns = ["ID", "Test Case", "Test Option", "Type", "Count", "Message", "Log Type", "Log File Path", "Excluded", "Comments"]
         self.settings = QSettings("LogTriage", "LogTriageApp")
         self.all_rows = []
