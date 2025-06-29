@@ -93,7 +93,7 @@ python3 new_ver.py
 
     Tagging System:  Allow users to tag log entries for categorization.
 
-    While adding comments, if particular row message is same, the comments must be applied to all row
+    When adding comments, apply them to all rows with the same message.
 
     Once all the features are added, Need to add the below features
       split the code into different files for re-usage
