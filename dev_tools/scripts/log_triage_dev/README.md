@@ -89,11 +89,19 @@ python3 new_ver.py
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------
 
-## TODO Feature Ideas to Consider
+## TODO Future Ideas to Consider
+
+    Tagging System:  Allow users to tag log entries for categorization.
+
+    While adding comments, if particular row message is same, the comments must be applied to all row
 
     Once all the features are added, Need to add the below features
       split the code into different files for re-usage
     
     Command Line Interface (CLI): For users who prefer scripting or automation.
+
+    Auto-Triage Suggestions:  Use simple heuristics or ML to suggest likely causes or group similar issues.
+    
+    Integration Hooks: Allow integration with bug tracking tools (e.g., JIRA) or CI/CD pipelines.
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------
