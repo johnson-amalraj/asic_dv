@@ -50,7 +50,7 @@ LogTriage streamlines the log review process, making it easier to focus on criti
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 
-#Features
+# Features
 1. Log File Loading
 
     Load and parse simulation/compile log files (.log, .log.gz) from folders, including recursive search.
