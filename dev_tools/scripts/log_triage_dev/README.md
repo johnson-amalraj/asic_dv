@@ -4,9 +4,51 @@ Key capabilities include advanced filtering and searching, multi-column sorting,
 
 LogTriage streamlines the log review process, making it easier to focus on critical issues, collaborate with team members, and generate actionable reports from complex log data.
 
-# Example Log Path
+-------------------------------------------------------------------------------------------------------------------------------------------
 
-/home/data/mpu32_simulation/MUSTANG_ST012_A0/simulation_logs/MUSTANG_ST012_A0_HPP_ISS_RTL7_ECO0/RTL_rtl7_eco0_Regression_06_13_2025/max/
+# How to Use
+
+## How to Run
+
+    - python3 logtriage.py &
+
+## Load Log Files
+    - Go to File > Load Log Folder (Ctrl+O) and select the directory containing your simulate.log and/or compile.log files (supports .gz).
+
+## Browse and Analyze
+    - View parsed log messages in the main table.
+    - Use the filter boxes below each column header to filter by text, regex, or numeric range.
+    - Click column headers to sort; Shift+Click for multi-column sorting.
+
+## Search and Find
+    - Press Ctrl+F or use Edit > Find to search for messages (supports regex).
+
+## Manage Exclusions
+    - Select rows and use Exclusion > Add to Exclusion (Ctrl+X) to exclude messages.
+    - View, import, export, or clear the exclusion list from the Exclusion menu.
+    - Toggle to show only excluded or non-excluded rows.
+
+## Add Comments
+    - Double-click the Comments column to add or edit notes for any row.
+
+## Export Data
+    - Export filtered or selected rows to CSV via File > Export to CSV (Ctrl+E).
+    - Export summary tables or exclusion lists from their respective menus.
+
+## Visualize
+    - Use the Visualization menu to view pie charts, timelines, or heatmaps of log events.
+    - Export charts as images if needed.
+
+## Session Management
+    - Save your current session (including comments and exclusions) via Session > Save Session.
+    - Load a previous session from the same menu.
+
+## Customize and Get Help
+    - Toggle dark mode in Settings.
+    - Show/hide columns in the Columns menu.
+    - See all keyboard shortcuts and features in the Help menu.
+
+-------------------------------------------------------------------------------------------------------------------------------------------
 
 #Features
 1. Log File Loading
@@ -80,47 +122,7 @@ LogTriage streamlines the log review process, making it easier to focus on criti
     Robust error handling and logging (errors are logged to tool_error.log).
     Help menu with shortcut keys, features, and author info.
 
-# How to Use
-
-## How to Run
-
-    - python3 logtriage.py &
-
-## Load Log Files
-    - Go to File > Load Log Folder (Ctrl+O) and select the directory containing your simulate.log and/or compile.log files (supports .gz).
-
-## Browse and Analyze
-    - View parsed log messages in the main table.
-    - Use the filter boxes below each column header to filter by text, regex, or numeric range.
-    - Click column headers to sort; Shift+Click for multi-column sorting.
-
-## Search and Find
-    - Press Ctrl+F or use Edit > Find to search for messages (supports regex).
-
-## Manage Exclusions
-    - Select rows and use Exclusion > Add to Exclusion (Ctrl+X) to exclude messages.
-    - View, import, export, or clear the exclusion list from the Exclusion menu.
-    - Toggle to show only excluded or non-excluded rows.
-
-## Add Comments
-    - Double-click the Comments column to add or edit notes for any row.
-
-## Export Data
-    - Export filtered or selected rows to CSV via File > Export to CSV (Ctrl+E).
-    - Export summary tables or exclusion lists from their respective menus.
-
-## Visualize
-    - Use the Visualization menu to view pie charts, timelines, or heatmaps of log events.
-    - Export charts as images if needed.
-
-## Session Management
-    - Save your current session (including comments and exclusions) via Session > Save Session.
-    - Load a previous session from the same menu.
-
-## Customize and Get Help
-    - Toggle dark mode in Settings.
-    - Show/hide columns in the Columns menu.
-    - See all keyboard shortcuts and features in the Help menu.
+-------------------------------------------------------------------------------------------------------------------------------------------
 
 # Future Ideas (TODO)
 
@@ -130,3 +132,5 @@ LogTriage streamlines the log review process, making it easier to focus on criti
     - Command Line Interface (CLI): For users who prefer scripting or automation.
     - Auto-Triage Suggestions: Use simple heuristics or ML to suggest likely causes or group similar issues.
     - Integration Hooks: Allow integration with bug tracking tools (e.g., JIRA) or CI/CD pipelines.
+
+-------------------------------------------------------------------------------------------------------------------------------------------
