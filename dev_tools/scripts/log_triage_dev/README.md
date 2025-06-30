@@ -4,11 +4,15 @@ Key capabilities include advanced filtering and searching, multi-column sorting,
 
 LogTriage streamlines the log review process, making it easier to focus on critical issues, collaborate with team members, and generate actionable reports from complex log data.
 
+# Documentation
+
+https://confluence.microchip.com/display/MPU/Log+Triage+Tool
+
 # Example Log Path
 
 /home/data/mpu32_simulation/MUSTANG_ST012_A0/simulation_logs/MUSTANG_ST012_A0_HPP_ISS_RTL7_ECO0/RTL_rtl7_eco0_Regression_06_13_2025/max/
 
-# Features
+#Features
 1. Log File Loading
 
     Load and parse simulation/compile log files (.log, .log.gz) from folders, including recursive search.
@@ -82,42 +86,42 @@ LogTriage streamlines the log review process, making it easier to focus on criti
 
 # How to Use
 
-##How to Run
+## How to Run
 
-    - python3 logtriage.py &
+    - bsub -R "rUsage[RAM=10000]" python3 logtriage.py &
 
-##Load Log Files
+## Load Log Files
     - Go to File > Load Log Folder (Ctrl+O) and select the directory containing your simulate.log and/or compile.log files (supports .gz).
 
-##Browse and Analyze
+## Browse and Analyze
     - View parsed log messages in the main table.
     - Use the filter boxes below each column header to filter by text, regex, or numeric range.
     - Click column headers to sort; Shift+Click for multi-column sorting.
 
-##Search and Find
+## Search and Find
     - Press Ctrl+F or use Edit > Find to search for messages (supports regex).
 
-##Manage Exclusions
+## Manage Exclusions
     - Select rows and use Exclusion > Add to Exclusion (Ctrl+X) to exclude messages.
     - View, import, export, or clear the exclusion list from the Exclusion menu.
     - Toggle to show only excluded or non-excluded rows.
 
-##Add Comments
+## Add Comments
     - Double-click the Comments column to add or edit notes for any row.
 
-##Export Data
+## Export Data
     - Export filtered or selected rows to CSV via File > Export to CSV (Ctrl+E).
     - Export summary tables or exclusion lists from their respective menus.
 
-##Visualize
+## Visualize
     - Use the Visualization menu to view pie charts, timelines, or heatmaps of log events.
     - Export charts as images if needed.
 
-##Session Management
+## Session Management
     - Save your current session (including comments and exclusions) via Session > Save Session.
     - Load a previous session from the same menu.
 
-##Customize and Get Help
+## Customize and Get Help
     - Toggle dark mode in Settings.
     - Show/hide columns in the Columns menu.
     - See all keyboard shortcuts and features in the Help menu.
