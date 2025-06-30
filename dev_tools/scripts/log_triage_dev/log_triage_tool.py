@@ -128,6 +128,8 @@ def parse_log_file(filepath):
                 if pat.search(line_stripped):
                     msg = re.sub(prefix, '', line_stripped)
                     msg = clean_message(msg)
+                    if is_uvm_summary_line(line_stripped):
+                        break  # skip this line
                     if typ == 'ERROR':
                         errors.append(msg)
                     elif typ == 'WARNING':
@@ -140,6 +142,14 @@ def parse_log_file(filepath):
     fatal_counts = Counter(fatals)
     warning_counts = Counter(warnings)
     return error_counts, fatal_counts, warning_counts
+
+def is_uvm_summary_line(line):
+    # Remove leading/trailing spaces for robust matching
+    line = line.strip()
+    return (
+        re.match(r"Number of (demoted|caught) UVM_(FATAL|ERROR|WARNING) reports\s*:\s*\d+", line)
+        is not None
+    )
 
 def extract_log_info(filepath):
     """
@@ -218,6 +228,87 @@ class ChartDialog(QDialog):
                 QMessageBox.information(self, "Export", f"Chart exported to {path}")
             except Exception as e:
                 QMessageBox.critical(self, "Export Error", f"Failed to export chart:\n{e}")
+
+class FeaturesDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Features")
+        self.resize(800, 600)  # Initial size, but user can resize/maximize
+
+        layout = QVBoxLayout(self)
+        self.text_edit = QTextEdit(self)
+        self.text_edit.setReadOnly(True)
+        self.text_edit.setHtml(self.get_features_html())
+        layout.addWidget(self.text_edit)
+
+        btn = QPushButton("Close", self)
+        btn.clicked.connect(self.accept)
+        layout.addWidget(btn)
+
+    def get_features_html(self):
+        return (
+            "<h2>LogTriage Application – Features</h2>"
+            "<ol>"
+            "<li><b>Log File Loading</b><ul>"
+            "<li>Load and parse simulation/compile log files (<code>.log</code>, <code>.log.gz</code>) from folders, including recursive search.</li>"
+            "<li>Supports both <code>simulate.log</code> and <code>compile.log</code> files.</li>"
+            "<li>Progress bar and status messages during long operations.</li>"
+            "<li>Recent folders menu for quick access.</li>"
+            "</ul></li>"
+            "<li><b>Tabular Log View</b><ul>"
+            "<li>Display log messages in a table with columns: <i>ID, Test Case, Test Option, Type, Count, Message, Log Type, Log File Path, Excluded, Comments</i>.</li>"
+            "<li>Double-click a row to open the corresponding log file in an external editor.</li>"
+            "</ul></li>"
+            "<li><b>Filtering and Sorting</b><ul>"
+            "<li>Per-column filtering: supports text, regex, numeric, and exclusion status filters.</li>"
+            "<li>Multi-column sorting: Shift+Click on headers to sort by multiple columns.</li>"
+            "</ul></li>"
+            "<li><b>Find and Highlight</b><ul>"
+            "<li>Find dialog with regex support and row highlighting for quick search.</li>"
+            "</ul></li>"
+            "<li><b>Exclusion List Management</b><ul>"
+            "<li>Add messages to an exclusion list.</li>"
+            "<li>View, import, export, and clear the exclusion list.</li>"
+            "<li>Visual indication for excluded rows.</li>"
+            "<li>Filter to show only excluded or only non-excluded rows.</li>"
+            "</ul></li>"
+            "<li><b>Comments</b><ul>"
+            "<li>Add per-row comments (editable, multi-line, persistent).</li>"
+            "<li>Comments are saved and loaded with session files.</li>"
+            "</ul></li>"
+            "<li><b>Export and Import</b><ul>"
+            "<li>Export filtered or selected rows to CSV.</li>"
+            "<li>Export summary table to CSV.</li>"
+            "<li>Export exclusion list to CSV.</li>"
+            "<li>Import exclusion list from CSV.</li>"
+            "<li>Export charts as images.</li>"
+            "</ul></li>"
+            "<li><b>Session Management</b><ul>"
+            "<li>Save/load session (including comments and exclusions) for later review or sharing.</li>"
+            "</ul></li>"
+            "<li><b>Summary and Statistics</b><ul>"
+            "<li>Summary dialog: per-testcase/testopt counts for <b>ERROR</b>, <b>FATAL</b>, <b>WARNING</b> (total and unique).</li>"
+            "<li>Quick menu option to display current filtered row count and unique count in the status bar.</li>"
+            "</ul></li>"
+            "<li><b>Visualization</b><ul>"
+            "<li>Pie chart: Distribution of error types.</li>"
+            "<li>Grouped bar chart: Error/Fatal/Warning counts by test case.</li>"
+            "<li>Heatmap: Error frequency by test case, with selectable color schemes and cell count annotations.</li>"
+            "<li>Export all charts as images.</li>"
+            "</ul></li>"
+            "<li><b>User Interface and Usability</b><ul>"
+            "<li>Dark mode toggle for comfortable viewing.</li>"
+            "<li>Keyboard shortcuts for all major actions (see Help &gt; Shortcut Keys).</li>"
+            "<li>Status bar shows current row count, unique count, and error statistics.</li>"
+            "<li>Progress bar and status messages for long operations.</li>"
+            "<li>Memory usage warning for large datasets.</li>"
+            "</ul></li>"
+            "<li><b>Robustness and Help</b><ul>"
+            "<li>Robust error handling and logging (errors are logged to <code>tool_error.log</code>).</li>"
+            "<li>Help menu with shortcut keys, features, and author info.</li>"
+            "</ul></li>"
+            "</ol>"
+        )
 
 class ExclusionListDialog(QDialog):
     def __init__(self, exclusion_list, parent=None):
@@ -329,18 +420,43 @@ class SummaryDialog(QDialog):
         self.setWindowTitle("Summary Table")
         self.resize(900, 400)
         self.statusbar = statusbar
+        self.all_rows = summary_rows
+        self.filtered_rows = summary_rows.copy()
+        self.filters = []
+        self.init_ui()
+
+    def init_ui(self):
         layout = QVBoxLayout(self)
-        # 8 columns: Testcase, TestOpt, ERROR, ERROR(unique), FATAL, FATAL(unique), WARNING, WARNING(unique)
         headers = ["Test Case", "Test Option", "ERROR", "ERROR (unique)", "FATAL", "FATAL (unique)", "WARNING", "WARNING (unique)"]
-        self.table = QTableWidget(len(summary_rows), len(headers))
+        self.table = QTableWidget(len(self.all_rows), len(headers))
         self.table.setHorizontalHeaderLabels(headers)
-        for i, row in enumerate(summary_rows):
+        for i, row in enumerate(self.all_rows):
             for j, val in enumerate(row):
                 self.table.setItem(i, j, QTableWidgetItem(str(val)))
         layout.addWidget(self.table)
+        # Export button
         export_btn = QPushButton("Export Summary to CSV", self)
         export_btn.clicked.connect(self.export_summary)
         layout.addWidget(export_btn)
+
+    def apply_filters(self):
+        filters = [edit.text().strip().lower() for edit in self.filters]
+        self.filtered_rows = []
+        for row in self.all_rows:
+            match = True
+            for i, f in enumerate(filters):
+                if f and f not in str(row[i]).lower():
+                    match = False
+                    break
+            if match:
+                self.filtered_rows.append(row)
+        self.populate_table(self.filtered_rows)
+
+    def populate_table(self, rows):
+        self.table.setRowCount(len(rows))
+        for i, row in enumerate(rows):
+            for j, val in enumerate(row):
+                self.table.setItem(i, j, QTableWidgetItem(str(val)))
 
     def export_summary(self):
         try:
@@ -633,43 +749,10 @@ class LogTriageWindow(QMainWindow):
         dialog = ChartDialog(fig, "Pie Chart: Error Types", self, filter_widgets=[combo], on_filter_change=on_filter_change)
         dialog.exec_()
 
-    def show_timeline_chart(self):
-        import datetime
-        # Try to extract timestamps from log file paths or messages
-        times = []
-        for row in self.filtered_rows:
-            # Example: extract YYYY-MM-DD HH:MM:SS from message or file path
-            m = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', row[5])
-            if not m:
-                m = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', row[7])
-            if m:
-                try:
-                    t = datetime.datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S")
-                    times.append((t, row[3]))  # (datetime, type)
-                except Exception:
-                    continue
-        if not times:
-            QMessageBox.information(self, "Timeline", "No timestamps found in log messages or file paths.")
-            return
-        # Group by type
-        types = ["ERROR", "FATAL", "WARNING"]
-        fig = Figure(figsize=(7, 4))
-        ax = fig.add_subplot(111)
-        for typ, color in zip(types, ['#e74c3c', '#8e44ad', '#f1c40f']):
-            tlist = [t[0] for t in times if t[1] == typ]
-            if tlist:
-                ax.hist(tlist, bins=30, alpha=0.7, label=typ, color=color)
-        ax.set_title("Timeline of Log Events")
-        ax.set_xlabel("Time")
-        ax.set_ylabel("Count")
-        ax.legend()
-        fig.autofmt_xdate()
-        dlg = ChartDialog(fig, "Timeline: Log Events", self)
-        dlg.exec_()
-
     def show_heatmap_chart(self):
         import numpy as np
-        # Build matrix: rows = test cases, cols = error types
+        from PyQt5.QtWidgets import QComboBox
+    
         testcases = sorted({row[1] for row in self.filtered_rows})
         types = ["ERROR", "FATAL", "WARNING"]
         data = np.zeros((len(testcases), len(types)), dtype=int)
@@ -683,19 +766,99 @@ class LogTriageWindow(QMainWindow):
         if not np.any(data):
             QMessageBox.information(self, "Heatmap", "No error/warning/fatal data to plot.")
             return
+    
+        colormaps = ['viridis', 'plasma', 'inferno', 'magma', 'cividis', 'hot', 'OrRd', 'YlOrRd']
+        cmap_combo = QComboBox()
+        cmap_combo.addItems(colormaps)
+        cmap_combo.setCurrentText('viridis')
+    
         fig = Figure(figsize=(8, 6))
         ax = fig.add_subplot(111)
-        cax = ax.imshow(data, aspect='auto', cmap='hot')
-        ax.set_xticks(np.arange(len(types)))
-        ax.set_xticklabels(types)
-        ax.set_yticks(np.arange(len(testcases)))
-        ax.set_yticklabels(testcases)
-        ax.set_xlabel("Error Type")
-        ax.set_ylabel("Test Case")
-        fig.colorbar(cax, ax=ax, label="Count")
-        ax.set_title("Heatmap of Error Frequency by Test Case")
-        dlg = ChartDialog(fig, "Heatmap: Error Frequency", self)
-        dlg.exec_()
+        colorbar = [None]
+    
+        def plot_heatmap(ax, cmap_name):
+            ax.clear()
+            cax = ax.imshow(data, aspect='auto', cmap=cmap_name)
+            ax.set_xticks(np.arange(len(types)))
+            ax.set_xticklabels(types)
+            ax.set_yticks(np.arange(len(testcases)))
+            ax.set_yticklabels(testcases)
+            ax.set_xlabel("Error Type")
+            ax.set_ylabel("Test Case")
+            ax.set_title("Heatmap of Error Frequency by Test Case")
+            if colorbar[0] is not None:
+                colorbar[0].remove()
+            colorbar[0] = fig.colorbar(cax, ax=ax, label="Count")
+            fig.tight_layout()
+            # Annotate each cell with the count
+            for i in range(data.shape[0]):
+                for j in range(data.shape[1]):
+                    count = data[i, j]
+                    if count > 0:
+                        ax.text(j, i, str(count), ha='center', va='center',
+                                color='white' if count > data.max()/2 else 'black',
+                                fontsize=10, fontweight='bold')
+    
+        plot_heatmap(ax, cmap_combo.currentText())
+    
+        def on_cmap_change():
+            plot_heatmap(ax, cmap_combo.currentText())
+            dialog.canvas.draw()
+    
+        cmap_combo.currentIndexChanged.connect(on_cmap_change)
+    
+        dialog = ChartDialog(fig, "Heatmap: Error Frequency", self, filter_widgets=[cmap_combo])
+        dialog.exec_()
+
+    def show_grouped_bar_chart(self):
+        import numpy as np
+        from PyQt5.QtWidgets import QComboBox
+    
+        testcases = sorted({row[1] for row in self.filtered_rows})
+        types = ["ERROR", "FATAL", "WARNING"]
+        data = np.zeros((len(testcases), len(types)), dtype=int)
+        tc_idx = {tc: i for i, tc in enumerate(testcases)}
+        typ_idx = {typ: i for i, typ in enumerate(types)}
+        for row in self.filtered_rows:
+            tc = row[1]
+            typ = row[3]
+            if tc in tc_idx and typ in typ_idx:
+                data[tc_idx[tc], typ_idx[typ]] += int(row[4])
+        if not np.any(data):
+            QMessageBox.information(self, "Bar Chart", "No error/warning/fatal data to plot.")
+            return
+    
+        fig = Figure(figsize=(10, 6))
+        ax = fig.add_subplot(111)
+        x = np.arange(len(testcases))
+        width = 0.25
+    
+        colors = ['#e74c3c', '#8e44ad', '#f1c40f']  # ERROR, FATAL, WARNING
+        bars = []
+        for i, typ in enumerate(types):
+            bars.append(ax.bar(x + i*width - width, data[:, i], width, label=typ, color=colors[i]))
+    
+        ax.set_xticks(x)
+        ax.set_xticklabels(testcases, rotation=45, ha='right')
+        ax.set_ylabel("Count")
+        ax.set_xlabel("Test Case")
+        ax.set_title("Error/Fatal/Warning Counts by Test Case")
+        ax.legend()
+        fig.tight_layout()
+    
+        # Annotate bars with counts
+        for bar_group in bars:
+            for bar in bar_group:
+                height = bar.get_height()
+                if height > 0:
+                    ax.annotate(f'{int(height)}',
+                                xy=(bar.get_x() + bar.get_width() / 2, height),
+                                xytext=(0, 3),  # 3 points vertical offset
+                                textcoords="offset points",
+                                ha='center', va='bottom', fontsize=9, fontweight='bold')
+    
+        dialog = ChartDialog(fig, "Grouped Bar Chart: Error Types by Test Case", self)
+        dialog.exec_()
 
     def get_message_stats(self):
         """
@@ -837,7 +1000,13 @@ class LogTriageWindow(QMainWindow):
         show_summary_action.setShortcut("Ctrl+S")
         show_summary_action.triggered.connect(self.show_summary)
         summary_menu.addAction(show_summary_action)
-    
+        
+        # Add this for quick row stats
+        show_row_stats_action = QAction("Show Row Stats", self)
+        show_row_stats_action.setShortcut("Ctrl+Shift+R")
+        show_row_stats_action.triggered.connect(self.show_row_stats)
+        summary_menu.addAction(show_row_stats_action)
+
         # Session menu
         session_menu = self.menu.addMenu("&Session")
         save_session_action = QAction("Save Session", self)
@@ -864,13 +1033,14 @@ class LogTriageWindow(QMainWindow):
         pie_action.triggered.connect(self.show_pie_chart)
         visual_menu.addAction(pie_action)
         
-        timeline_action = QAction("Timeline: Log Events", self)
-        timeline_action.triggered.connect(self.show_timeline_chart)
-        visual_menu.addAction(timeline_action)
-        
         heatmap_action = QAction("Heatmap: Error Frequency", self)
         heatmap_action.triggered.connect(self.show_heatmap_chart)
         visual_menu.addAction(heatmap_action)
+
+        # In your init_menus() under Visualization menu:
+        bar_action = QAction("Grouped Bar Chart: Error Types by Test Case", self)
+        bar_action.triggered.connect(self.show_grouped_bar_chart)
+        visual_menu.addAction(bar_action)
 
         # Help menu
         help_menu = self.menu.addMenu("&Help")
@@ -935,6 +1105,8 @@ class LogTriageWindow(QMainWindow):
         self.progress.setValue(0)
         self.progress.setFormat(f"Loading 0/{len(log_files)} files...")
     
+        self.statusbar.showMessage(f"Loading log file folder path: {folder} ...")
+
         # Start worker thread
         self.worker = LogParseWorker(log_files, self.show_simulate, self.show_compile, self.show_scoreboard)
         self.worker.progress.connect(self.on_parse_progress)
@@ -1051,7 +1223,17 @@ class LogTriageWindow(QMainWindow):
                         row_index = j - 1
                     else:
                         continue  # Should not happen
-                    item = QTableWidgetItem(str(row[row_index]))
+            
+                    # Only for the "Count" column, set integer data for sorting
+                    if col == "Count":
+                        item = QTableWidgetItem(str(row[row_index]))
+                        try:
+                            item.setData(Qt.EditRole, int(row[row_index]))
+                        except Exception:
+                            item.setData(Qt.EditRole, 0)  # fallback if conversion fails
+                    else:
+                        item = QTableWidgetItem(str(row[row_index]))
+            
                     # Color coding
                     if row[3] == "ERROR":
                         item.setForeground(Qt.red)
@@ -1066,6 +1248,7 @@ class LogTriageWindow(QMainWindow):
                 if is_excluded:
                     item.setBackground(Qt.lightGray)
                 self.table.setItem(i, j, item)
+
         self.table.setColumnHidden(7, False)
         self.update_filter_row_geometry()
 
@@ -1226,16 +1409,33 @@ class LogTriageWindow(QMainWindow):
     def show_summary(self):
         summary = defaultdict(lambda: {"ERROR":0, "FATAL":0, "WARNING":0})
         unique_msgs = defaultdict(lambda: {"ERROR": set(), "FATAL": set(), "WARNING": set()})
+        excluded_counts = defaultdict(lambda: {"ERROR":0, "FATAL":0, "WARNING":0})
+        log_types = defaultdict(set)
+    
+        # Only process rows with non-empty Test Case and Test Option
         for row in self.filtered_rows:
             testcase = row[1]
             testopt = row[2]
+            if not testcase or not testopt:
+                continue
             typ = row[3]
             count = int(row[4])
             msg = row[5]
+            log_type = row[6]  # "simulate" or "compile"
             summary[(testcase, testopt)][typ] += count
             unique_msgs[(testcase, testopt)][typ].add(msg)
+            if msg in self.exclusion_list:
+                excluded_counts[(testcase, testopt)][typ] += count
+            log_types[(testcase, testopt)].add(log_type)
+    
         summary_rows = []
         for (testcase, testopt), counts in summary.items():
+            # Only add rows with at least one non-zero count
+            if (counts["ERROR"] == 0 and counts["FATAL"] == 0 and counts["WARNING"] == 0):
+                continue
+            log_type_set = log_types[(testcase, testopt)]
+            compile_present = "Yes" if "compile" in log_type_set else "No"
+            simulate_present = "Yes" if "simulate" in log_type_set else "No"
             summary_rows.append([
                 testcase, testopt,
                 counts["ERROR"], len(unique_msgs[(testcase, testopt)]["ERROR"]),
@@ -1245,6 +1445,16 @@ class LogTriageWindow(QMainWindow):
         # Update SummaryDialog to accept and display these columns
         dlg = SummaryDialog(summary_rows, self, statusbar=self.statusbar)
         dlg.exec_()
+
+    def show_row_stats(self):
+        row_count = len(self.filtered_rows)
+        unique_rows = len({tuple(row) for row in self.filtered_rows})
+        stats = self.get_message_stats()
+        msg = (f"Showing {row_count} rows | Unique rows: {unique_rows} | "
+               f"ERROR: {stats['ERROR']['total']} ({stats['ERROR']['unique']} unique), "
+               f"FATAL: {stats['FATAL']['total']} ({stats['FATAL']['unique']} unique), "
+               f"WARNING: {stats['WARNING']['total']} ({stats['WARNING']['unique']} unique)")
+        self.statusbar.showMessage(msg)
 
     # --- Context Menu ---
     def show_context_menu(self, pos):
@@ -1299,6 +1509,8 @@ class LogTriageWindow(QMainWindow):
             "\n"
             "Summary Menu:\n"
             "  Ctrl+S: Show Summary\n"
+            # Add this line for your new shortcut:
+            "  Ctrl+Shift+R: Show Row Stats\n"
             "\n"
             "Session Menu:\n"
             "  Ctrl+Shift+S: Save Session\n"
@@ -1314,30 +1526,8 @@ class LogTriageWindow(QMainWindow):
         )
 
     def show_features(self):
-        QMessageBox.information(self, "Features",
-            "- Load and parse simulation/compile log files (.log, .log.gz) from folders\n"
-            "- Tabular view of log messages with columns: ID, Test Case, Test Option, Type, Count, Message, Log Type, Log File Path, Excluded, Comments\n"
-            "- Per-column filtering (text, regex, numeric, exclusion status)\n"
-            "- Multi-column sorting (Shift+Click on headers)\n"
-            "- Find dialog with regex support and row highlighting\n"
-            "- Add messages to exclusion list; view, import, export, and clear exclusion list\n"
-            "- Visual indication for excluded rows; filter to show only excluded/non-excluded\n"
-            "- Per-row comments (editable, multi-line, persistent)\n"
-            "- Export filtered or selected rows to CSV\n"
-            "- Export summary table to CSV\n"
-            "- Save/load session (including comments and exclusions)\n"
-            "- Summary dialog: per-testcase/testopt counts for ERROR, FATAL, WARNING (total and unique)\n"
-            "- Pie chart, timeline, and heatmap visualizations of log events\n"
-            "- Export charts as images\n"
-            "- Dark mode toggle\n"
-            "- Keyboard shortcuts for all major actions (see Help > Shortcut Keys)\n"
-            "- Open log file in external editor (double-click row)\n"
-            "- Recent folders menu for quick access\n"
-            "- Progress bar and status messages for long operations\n"
-            "- Memory usage warning for large datasets\n"
-            "- Robust error handling and logging\n"
-            "- Help menu with shortcuts, features, and author info"
-        )
+        dlg = FeaturesDialog(self)
+        dlg.exec_()
 
     def show_author(self):
         QMessageBox.information(self, "Author",
