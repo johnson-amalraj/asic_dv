@@ -124,14 +124,3 @@ LogTriage streamlines the log review process, making it easier to focus on criti
     Help menu with shortcut keys, features, and author info.
 
 -------------------------------------------------------------------------------------------------------------------------------------------
-
-# Future Ideas (TODO)
-
-    - Tagging System: Allow users to tag log entries for categorization.
-    - Bulk Commenting: When adding comments, apply them to all rows with the same message.
-    - Code Refactoring: Once all features are added, split the code into different files for re-use.
-    - Command Line Interface (CLI): For users who prefer scripting or automation.
-    - Auto-Triage Suggestions: Use simple heuristics or ML to suggest likely causes or group similar issues.
-    - Integration Hooks: Allow integration with bug tracking tools (e.g., JIRA) or CI/CD pipelines.
-
--------------------------------------------------------------------------------------------------------------------------------------------
