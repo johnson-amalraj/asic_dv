@@ -4,15 +4,11 @@ Key capabilities include advanced filtering and searching, multi-column sorting,
 
 LogTriage streamlines the log review process, making it easier to focus on critical issues, collaborate with team members, and generate actionable reports from complex log data.
 
-#Documentation
-
-https://confluence.microchip.com/display/MPU/Log+Triage+Tool
-
-#Example Log Path
+# Example Log Path
 
 /home/data/mpu32_simulation/MUSTANG_ST012_A0/simulation_logs/MUSTANG_ST012_A0_HPP_ISS_RTL7_ECO0/RTL_rtl7_eco0_Regression_06_13_2025/max/
 
-#Features
+# Features
 1. Log File Loading
 
     Load and parse simulation/compile log files (.log, .log.gz) from folders, including recursive search.
@@ -84,11 +80,11 @@ https://confluence.microchip.com/display/MPU/Log+Triage+Tool
     Robust error handling and logging (errors are logged to tool_error.log).
     Help menu with shortcut keys, features, and author info.
 
-#How to Use
+# How to Use
 
 ##How to Run
 
-    - bsub -R "rUsage[RAM=10000]" python3 logtriage.py &
+    - python3 logtriage.py &
 
 ##Load Log Files
     - Go to File > Load Log Folder (Ctrl+O) and select the directory containing your simulate.log and/or compile.log files (supports .gz).
@@ -126,7 +122,7 @@ https://confluence.microchip.com/display/MPU/Log+Triage+Tool
     - Show/hide columns in the Columns menu.
     - See all keyboard shortcuts and features in the Help menu.
 
-#Future Ideas (TODO)
+# Future Ideas (TODO)
 
     - Tagging System: Allow users to tag log entries for categorization.
     - Bulk Commenting: When adding comments, apply them to all rows with the same message.
