@@ -1,0 +1,13 @@
+Type,Regex
+ERROR,UVM_ERROR
+WARNING,UVM_WARNING
+FATAL,UVM_FATAL
+ERROR,^\*\* Error:
+WARNING,^\*\* Warning:
+FATAL,^\*\* Fatal:
+ERROR,^-E-
+FATAL,^-F-
+WARNING,^-W-
+ERROR,\bError\b
+WARNING,\bWarning\b
+FATAL,\bFatal\b
