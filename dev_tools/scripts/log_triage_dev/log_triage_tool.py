@@ -73,70 +73,41 @@ def open_log_file_anytype(filepath):
     else:
         return open(filepath, 'r', encoding='utf-8', errors='ignore')
 
-def parse_log_file(filepath):
-    """
-    Parse a log file and extract error, fatal, and warning messages from
-    VCS, Questa, Xcelium, UVM, xmelab, and -E-/F-/W- formats.
-    """
-    patterns = [
-        # UVM
-        ('ERROR',   re.compile(r'UVM_ERROR'),   r'^.*UVM_ERROR\s*:? ?'),
-        ('WARNING', re.compile(r'UVM_WARNING'), r'^.*UVM_WARNING\s*:? ?'),
-        ('FATAL',   re.compile(r'UVM_FATAL'),   r'^.*UVM_FATAL\s*:? ?'),
+def load_patterns_from_file(patterns_file):
+    import csv
+    patterns = []
+    with open(patterns_file, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            typ = row['Type']
+            regex = re.compile(row['Regex'])
+            patterns.append((typ, regex))
+    return patterns
 
-        # Questa/ModelSim
-        ('ERROR',   re.compile(r'^\*\* Error:'),   r'^\*\* Error:\s*'),
-        ('WARNING', re.compile(r'^\*\* Warning:'), r'^\*\* Warning:\s*'),
-        ('FATAL',   re.compile(r'^\*\* Fatal:'),   r'^\*\* Fatal:\s*'),
-
-        # VCS
-        ('ERROR',   re.compile(r'^Error-$$.*?$$'),   r'^Error-$$.*?$$\s*'),
-        ('WARNING', re.compile(r'^Warning-$$.*?$$'), r'^Warning-$$.*?$$\s*'),
-        ('FATAL',   re.compile(r'^Fatal:'),          r'^Fatal:\s*'),
-
-        # Xcelium (ncvlog/ncsim)
-        ('ERROR',   re.compile(r'ncvlog: \*E,'),   r'^.*ncvlog: \*E,[^:]*:?\s*'),
-        ('WARNING', re.compile(r'ncvlog: \*W,'),   r'^.*ncvlog: \*W,[^:]*:?\s*'),
-        ('FATAL',   re.compile(r'ncsim: \*F,'),    r'^.*ncsim: \*F,[^:]*:?\s*'),
-
-        # xmelab
-        ('ERROR',   re.compile(r'xmelab: \*E,'),   r'^.*xmelab: \*E,[^:]*:?\s*'),
-        ('WARNING', re.compile(r'xmelab: \*W,'),   r'^.*xmelab: \*W,[^:]*:?\s*'),
-
-        # -E-, -F-, -W- patterns
-        ('ERROR',   re.compile(r'^-E-'), r'^-E-\s*'),
-        ('FATAL',   re.compile(r'^-F-'), r'^-F-\s*'),
-        ('WARNING', re.compile(r'^-W-'), r'^-W-\s*'),
-
-        # *E, *F, *W patterns (sometimes used)
-        ('ERROR',   re.compile(r'^\*E'), r'^\*E\s*'),
-        ('FATAL',   re.compile(r'^\*F'), r'^\*F\s*'),
-        ('WARNING', re.compile(r'^\*W'), r'^\*W\s*'),
-
-        # Generic (case-insensitive, less specific, so last)
-        ('ERROR',   re.compile(r'\bError\b', re.IGNORECASE),   r'^.*Error\s*:? ?'),
-        ('WARNING', re.compile(r'\bWarning\b', re.IGNORECASE), r'^.*Warning\s*:? ?'),
-        ('FATAL',   re.compile(r'\bFatal\b', re.IGNORECASE),   r'^.*Fatal\s*:? ?'),
-    ]
-
+def parse_log_file(filepath, patterns):
     errors, fatals, warnings = [], [], []
-
     with open_log_file_anytype(filepath) as f:
-        for line in f:
+        for lineno, line in enumerate(f, 1):
             line_stripped = line.strip()
-            for typ, pat, prefix in patterns:
-                if pat.search(line_stripped):
-                    msg = re.sub(prefix, '', line_stripped)
+            for typ, pat in patterns:
+                m = pat.search(line_stripped)
+                if m:
+                    # Remove the matched prefix (from start of line up to and including the match)
+                    start, end = m.span()
+                    if start == 0:
+                        msg = line_stripped[end:].lstrip(": \t")
+                    else:
+                        msg = line_stripped
                     msg = clean_message(msg)
                     if is_uvm_summary_line(line_stripped):
-                        break  # skip this line
+                        break
                     if typ == 'ERROR':
-                        errors.append(msg)
+                        errors.append((msg, lineno))
                     elif typ == 'WARNING':
-                        warnings.append(msg)
+                        warnings.append((msg, lineno))
                     elif typ == 'FATAL':
-                        fatals.append(msg)
-                    break  # Only match the first pattern per line
+                        fatals.append((msg, lineno))
+                    break
 
     error_counts = Counter(errors)
     fatal_counts = Counter(fatals)
@@ -226,8 +197,10 @@ class ChartDialog(QDialog):
             try:
                 self.canvas.figure.savefig(path)
                 QMessageBox.information(self, "Export", f"Chart exported to {path}")
+                logging.info(f"Chart exported to {path}.")
             except Exception as e:
                 QMessageBox.critical(self, "Export Error", f"Failed to export chart:\n{e}")
+                logging.error(f"Export Error", f"Failed to export chart:{e}")
 
 class FeaturesDialog(QDialog):
     def __init__(self, parent=None):
@@ -319,6 +292,7 @@ class ExclusionListDialog(QDialog):
 
         # Add count label
         count_label = QLabel(f"Total excluded messages: {len(exclusion_list)}")
+        logging.info(f"Total excluded messages: {len(exclusion_list)}.")
         layout.addWidget(count_label)
 
         self.table = QTableWidget(len(exclusion_list), 1)
@@ -380,6 +354,7 @@ class FindDialog(QDialog):
                 pattern = None
         except re.error as e:
             QMessageBox.warning(self, "Regex Error", f"Invalid regex pattern:\n{e}")
+            logging.error(f"Regex Error, Invalid regex pattern:{e}.")
             return
 
         for i in range(self.table.rowCount()):
@@ -401,6 +376,7 @@ class FindDialog(QDialog):
             self.current = 0
         else:
             QMessageBox.information(self, "Find", "No matches found.")
+            logging.warning(f"Find", "No matches found.")
 
     def find_next(self):
         if not self.matches:
@@ -473,10 +449,12 @@ class SummaryDialog(QDialog):
                     writer.writerow(row)
             if self.statusbar:
                 self.statusbar.showMessage(f"Summary exported to {path}")
+                logging.info(f"Summary exported to {path}.")
             QMessageBox.information(self, "Export", f"Summary exported to {path}")
         except Exception as e:
             if self.statusbar:
                 self.statusbar.showMessage(f"Failed to export summary: {e}")
+                logging.error(f"Failed to export summary: {e}.")
             QMessageBox.critical(self, "Export Error", f"Failed to export summary:\n{e}")
 
 class CommentEditDialog(QDialog):
@@ -503,9 +481,13 @@ class CommentEditDialog(QDialog):
 class LogTriageWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.patterns_file = os.path.join(os.path.dirname(__file__), "patterns.csv")
+        self.patterns = load_patterns_from_file(self.patterns_file)
+        self.is_loading = False
+        self.stop_requested = False
         self.comments_dict = {}  # {row_key: comment}
-        self.setWindowTitle("Log Triage v5.0")
-        self.columns = ["ID", "Test Case", "Test Option", "Type", "Count", "Message", "Log Type", "Log File Path", "Excluded", "Comments"]
+        self.setWindowTitle("Log Triage v7.0")
+        self.columns = ["ID", "Test Case", "Test Option", "Type", "Count", "Message", "Log Type", "Log File Path", "Line Number", "Excluded", "Comments"]
         self.settings = QSettings("LogTriage", "LogTriageApp")
         self.all_rows = []
         self.filtered_rows = []
@@ -585,6 +567,11 @@ class LogTriageWindow(QMainWindow):
         self.progress.setFormat("")  # We'll set this dynamically
         vbox.addWidget(self.progress)
 
+        self.stop_btn = QPushButton("Stop Loading", self)
+        self.stop_btn.setEnabled(False)
+        self.stop_btn.clicked.connect(self.stop_loading)
+        vbox.addWidget(self.stop_btn)
+
         # Status bar
         self.statusbar = QStatusBar()
         self.setStatusBar(self.statusbar)
@@ -609,6 +596,17 @@ class LogTriageWindow(QMainWindow):
         self.find_action.triggered.connect(self.show_find_dialog)
         self.addAction(self.find_action)
 
+    def load_patterns_file(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Load Patterns File", os.getcwd(), "CSV Files (*.csv)")
+        if not path:
+            return
+        try:
+            self.patterns = load_patterns_from_file(path)
+            self.patterns_file = path
+            QMessageBox.information(self, "Patterns Loaded", f"Patterns loaded from {path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load patterns file:\n{e}")
+
     # --- Persistence ---
     def save_recent_folders(self, folder):
         folders = self.load_recent_folders()
@@ -619,6 +617,15 @@ class LogTriageWindow(QMainWindow):
         folders = folders[:MAX_RECENT_FOLDERS]
         self.settings.setValue(RECENT_FOLDERS_KEY, folders)
         self.recent_folders = folders
+
+    def stop_loading(self):
+        self.stop_requested = True
+        if hasattr(self, 'worker') and self.worker.isRunning():
+            self.worker.stop()
+            self.stop_btn.setEnabled(False)
+            self.statusbar.showMessage("Loading stopped by user. Waiting for worker to finish...")
+            logging.info(f"Loading stopped by user. Waiting for worker to finish...")
+        # Do not update the table here; wait for on_parse_finished
 
     def load_recent_folders(self):
         return self.settings.value(RECENT_FOLDERS_KEY, [], type=list)
@@ -994,6 +1001,10 @@ class LogTriageWindow(QMainWindow):
         self.scoreboard_action.triggered.connect(self.toggle_scoreboard)
         log_menu.addAction(self.scoreboard_action)
     
+        load_patterns_action = QAction("Load Patterns File...", self)
+        load_patterns_action.triggered.connect(self.load_patterns_file)
+        file_menu.addAction(load_patterns_action)  # or settings_menu.addAction(...)
+
         # Summary menu
         summary_menu = self.menu.addMenu("&Summary")
         show_summary_action = QAction("Show Summary", self)
@@ -1071,15 +1082,31 @@ class LogTriageWindow(QMainWindow):
                 self.recent_menu.addAction(act)
 
     # --- Log Loading ---
+    def set_loading_ui(self, loading):
+        self.stop_btn.setEnabled(loading)
+        self.menu.setEnabled(not loading)
+        # Optionally, disable/enable specific actions if you want finer control
+
     def load_log_folder(self, folder=None):
+        if self.is_loading:
+            QMessageBox.warning(self, "Loading in Progress", "A folder is already being loaded. Please wait until it finishes or stop the current load.")
+            logging.warning(f"Loading in Progress", "A folder is already being loaded. Please wait until it finishes or stop the current load.")
+            return
+        self.is_loading = True
+        self.set_loading_ui(True)
         if not folder:
             last_folder = self.settings.value("lastFolder", "")
             folder = QFileDialog.getExistingDirectory(self, "Select Log Folder", last_folder or "")
             if not folder:
+                self.is_loading = False
+                self.set_loading_ui(False)
                 return
             folder = folder.strip()
         if not os.path.isdir(folder):
             QMessageBox.warning(self, "Invalid Path", f"The path '{folder}' is not a valid directory.")
+            logging.warning(f"Invalid Path", f"The path '{folder}' is not a valid directory.")
+            self.is_loading = False
+            self.set_loading_ui(False)
             return
         self.loaded_folder = folder
         self.settings.setValue(LAST_FOLDER_KEY, folder)
@@ -1093,44 +1120,57 @@ class LogTriageWindow(QMainWindow):
                 if (self.show_simulate and fname.startswith("simulate.log")) or (self.show_compile and fname.startswith("compile.log")):
                     if fname.endswith(".log") or fname.endswith(".log.gz"):
                         log_files.append(os.path.join(root, fname))
-        # --- Add this block ---
         if not log_files:
             self.statusbar.showMessage("No valid log files found in the selected folder.")
+            logging.warning(f"No valid log files found in the selected folder.")
             self.progress.setMaximum(1)
             self.progress.setValue(1)
             self.progress.setFormat("No log files found.")
+            self.is_loading = False
+            self.set_loading_ui(False)
             return
-        # ----------------------
         self.progress.setMaximum(len(log_files))
         self.progress.setValue(0)
         self.progress.setFormat(f"Loading 0/{len(log_files)} files...")
     
         self.statusbar.showMessage(f"Loading log file folder path: {folder} ...")
-
-        # Start worker thread
-        self.worker = LogParseWorker(log_files, self.show_simulate, self.show_compile, self.show_scoreboard)
+        logging.info(f"Loading log file folder path: {folder} ...")
+    
+        self.stop_requested = False
+        self.worker = LogParseWorker(log_files, self.show_simulate, self.show_compile, self.show_scoreboard, self.patterns)
         self.worker.progress.connect(self.on_parse_progress)
         self.worker.finished.connect(self.on_parse_finished)
         self.worker.start()
-    
+
     def on_parse_progress(self, current, total):
         self.progress.setValue(current)
         self.progress.setFormat(f"Loading {current}/{total} files...")
         QApplication.processEvents()
     
     def on_parse_finished(self, all_rows):
+        self.is_loading = False
+        self.set_loading_ui(False)
         self.progress.setValue(self.progress.maximum())
-        self.progress.setFormat(f"Loaded {self.progress.maximum()}/{self.progress.maximum()} files.")
+        self.progress.setFormat(f"Loaded {self.progress.value()}/{self.progress.maximum()} files.")
+        logging.info(f"Loaded {self.progress.value()}/{self.progress.maximum()} files.")
         self.folder_status_label.setText(f"Loaded log file folder path: {self.loaded_folder}")
+        logging.info(f"Loaded log file folder path: {self.loaded_folder}")
         self.all_rows = group_rows(all_rows)
         self.filtered_rows = self.all_rows.copy()
         self.apply_filters()
         self.update_table()
+        if self.stop_requested:
+            self.statusbar.showMessage("Loading stopped by user. Partial results shown.")
+            logging.info(f"Loading stopped by user. Partial results shown.")
+        else:
+            self.statusbar.showMessage("All files loaded.")
+            logging.info(f"All files loaded.")
 
     def reload_last_folder(self):
         folder = self.settings.value(LAST_FOLDER_KEY, "")
         if not folder or not os.path.isdir(folder):
             QMessageBox.warning(self, "Reload", "No valid last loaded folder found.")
+            logging.warning(f"Reload, No valid last loaded folder found.")
             return
         self.load_log_folder(folder)
 
@@ -1200,6 +1240,7 @@ class LogTriageWindow(QMainWindow):
             QMessageBox.warning(self, "Memory Usage Warning",
                 f"High memory usage detected: {mem:.1f} MB.\n"
                 "Consider filtering or reducing the number of loaded files.")
+            logging.warning(f"Memory Usage Warning. High memory usage detected: {mem:.1f} MB. Consider filtering or reducing the number of loaded files.")
 
     def populate_table_rows(self):
         self.table.setRowCount(len(self.filtered_rows))
@@ -1332,6 +1373,7 @@ class LogTriageWindow(QMainWindow):
     
         if not export_rows:
             QMessageBox.warning(self, "Export", "No data to export.")
+            logging.warning(f"Export, No data to export.")
             return
     
         path, _ = QFileDialog.getSaveFileName(self, "Export to CSV", os.getcwd(), "CSV Files (*.csv)")
@@ -1345,6 +1387,7 @@ class LogTriageWindow(QMainWindow):
                 for row in export_rows:
                     writer.writerow(row)
             self.statusbar.showMessage(f"Exported {len(export_rows)} {export_type} rows to {path}")
+            logging.warning(f"Exported {len(export_rows)} {export_type} rows to {path}")
             excluded_count = sum(1 for row in export_rows if row[self.columns.index("Excluded")] == "Yes")
             QMessageBox.information(self, "Export Info",
                 f"Exported {len(export_rows)} {export_type} rows to {path}\n"
@@ -1352,6 +1395,7 @@ class LogTriageWindow(QMainWindow):
                 f"Excluded rows in export: {excluded_count}")
         except Exception as e:
             self.statusbar.showMessage(f"Failed to export: {e}")
+            logging.error(f"Failed to export: {e}")
             QMessageBox.critical(self, "Export Error", f"Failed to export:\n{e}")
 
     # --- Exclusion ---
@@ -1368,6 +1412,7 @@ class LogTriageWindow(QMainWindow):
         self.exclusion_list.update(rows)
         self.apply_filters()
         self.statusbar.showMessage(f"Added {len(rows)} messages to exclusion list.")
+        logging.warning(f"Added {len(rows)} messages to exclusion list.")
 
     def view_exclusion(self):
         dlg = ExclusionListDialog(self.exclusion_list, self)
@@ -1383,8 +1428,10 @@ class LogTriageWindow(QMainWindow):
                 for msg in sorted(self.exclusion_list):
                     writer.writerow([msg])
             self.statusbar.showMessage(f"Exclusion list exported to {path}")
+            logging.info(f"Exclusion list exported to {path}.")
         except Exception as e:
             QMessageBox.critical(self, "Export Error", f"Failed to export exclusion list:\n{e}")
+            logging.error(f"Export Error, Failed to export exclusion list:{e}")
 
     def import_exclusion_list(self):
         path, _ = QFileDialog.getOpenFileName(self, "Import Exclusion List", os.getcwd(), "CSV Files (*.csv)")
@@ -1397,13 +1444,16 @@ class LogTriageWindow(QMainWindow):
             self.apply_filters()
             self.update_table()
             self.statusbar.showMessage(f"Exclusion list imported from {path} and applied to current data.")
+            logging.info(f"Exclusion list imported from {path} and applied to current data.")
         except Exception as e:
             QMessageBox.critical(self, "Import Error", f"Failed to import exclusion list:\n{e}")
+            logging.error(f"Import Error, Failed to import exclusion list:{e}")
 
     def clear_exclusion(self):
         self.exclusion_list.clear()
         self.apply_filters()
         self.statusbar.showMessage("Exclusion list cleared.")
+        logging.info(f"Exclusion list cleared.")
 
     # --- Summary ---
     def show_summary(self):
@@ -1556,10 +1606,16 @@ class LogTriageWindow(QMainWindow):
     def open_log_file(self, index):
         row = index.row()
         filepath = self.table.item(row, 7).text()
+        try:
+            lineno = int(self.table.item(row, 8).text())
+        except Exception:
+            lineno = 1
         if os.path.isfile(filepath):
-            os.system(f"gvim '{filepath}' &")
+            # For gvim, use +{lineno} to jump to line
+            os.system(f"gvim '+{lineno}' '{filepath}' &")
         else:
             QMessageBox.warning(self, "Open Log File", f"File not found:\n{filepath}")
+            logging.warning(f"Open Log File", f"File not found:\n{filepath}.")
 
     def handle_table_double_click(self, index):
         if index.column() == len(self.columns) - 1:  # Comments column
@@ -1621,6 +1677,7 @@ class LogTriageWindow(QMainWindow):
             self.statusbar.showMessage(f"Session saved to {path}")
         except Exception as e:
             QMessageBox.critical(self, "Save Session Error", f"Failed to save session:\n{e}")
+            logging.error(f"Save Session Error, Failed to save session:{e}")
 
     def update_comments_dict_from_table(self):
         comments_col = self.columns.index("Comments")
@@ -1690,6 +1747,7 @@ class LogTriageWindow(QMainWindow):
             stats = self.get_message_stats()
             mem = get_memory_usage_mb()
             self.folder_status_label.setText(f"Loaded session file: {os.path.basename(path)}")
+            logging.info(f"Loaded session file: {os.path.basename(path)}")
             self.statusbar.showMessage(
                 f"Session loaded from {path} | Showing {len(self.filtered_rows)} rows | Memory: {mem:.1f} MB | "
                 f"ERROR: {stats['ERROR']['total']} ({stats['ERROR']['unique']} unique), "
@@ -1700,10 +1758,12 @@ class LogTriageWindow(QMainWindow):
             self.progress.setMaximum(1)
             self.progress.setValue(1)
             self.progress.setFormat("Session loaded.")
+            logging.info(f"Session loaded.")
             QApplication.processEvents()
         except Exception as e:
             self.progress.setFormat("Failed to load session.")
             QMessageBox.critical(self, "Load Session Error", f"Failed to load session:\n{e}")
+            logging.error(f"Load Session Error, Failed to load session:{e}.")
 
     def toggle_dark_mode(self):
         if self.dark_mode_action.isChecked():
@@ -1778,60 +1838,96 @@ class LogParseWorker(QThread):
     progress = pyqtSignal(int, int)  # current, total
     finished = pyqtSignal(list)      # all_rows
 
-    def __init__(self, log_files, show_simulate, show_compile, show_scoreboard):
+    def __init__(self, log_files, show_simulate, show_compile, show_scoreboard, patterns):
         super().__init__()
-        self.memory_warning_threshold_mb = 500  # You can make this configurable via a settings dialog
+        self._stop_requested = False
+        self.memory_warning_threshold_mb = 1024  # You can make this configurable via a settings dialog
         self.log_files = log_files
         self.show_simulate = show_simulate
         self.show_compile = show_compile
         self.show_scoreboard = show_scoreboard
+        self.patterns = patterns
 
     def run(self):
         all_rows = []
         for idx, filepath in enumerate(self.log_files):
+            if self._stop_requested:
+                break
             id_val, testcase, testopt = extract_log_info(filepath)
-            error_counts, fatal_counts, warning_counts = parse_log_file(filepath)
-            for msg, count in error_counts.items():
+            error_counts, fatal_counts, warning_counts = parse_log_file(filepath, self.patterns)
+            for (msg, lineno), count in error_counts.items():
                 if not self.show_scoreboard and "sbd_compare" in msg.lower():
                     continue
                 row = [
-                    id_val, testcase, testopt, "ERROR", count, msg, "simulate" if "simulate" in os.path.basename(filepath) else "compile", filepath
+                    id_val, testcase, testopt, "ERROR", count, msg, "simulate" if "simulate" in os.path.basename(filepath) else "compile", filepath, lineno
                 ]
                 all_rows.append(row)
-            for msg, count in fatal_counts.items():
+            for (msg, lineno), count in fatal_counts.items():
                 if not self.show_scoreboard and "sbd_compare" in msg.lower():
                     continue
                 row = [
-                    id_val, testcase, testopt, "FATAL", count, msg, "simulate" if "simulate" in os.path.basename(filepath) else "compile", filepath
+                    id_val, testcase, testopt, "FATAL", count, msg, "simulate" if "simulate" in os.path.basename(filepath) else "compile", filepath, lineno
                 ]
                 all_rows.append(row)
-            for msg, count in warning_counts.items():
+            for (msg, lineno), count in warning_counts.items():
                 if not self.show_scoreboard and "sbd_compare" in msg.lower():
                     continue
                 row = [
-                    id_val, testcase, testopt, "WARNING", count, msg, "simulate" if "simulate" in os.path.basename(filepath) else "compile", filepath
+                    id_val, testcase, testopt, "WARNING", count, msg, "simulate" if "simulate" in os.path.basename(filepath) else "compile", filepath, lineno
                 ]
                 all_rows.append(row)
             self.progress.emit(idx+1, len(self.log_files))
         self.finished.emit(all_rows)
 
-if __name__ == "__main__":
-    logging.basicConfig(
-        filename='tool_error.log',
-        level=logging.ERROR,
-        format='%(asctime)s %(levelname)s: %(message)s'
-    )
+    def stop(self):
+        self._stop_requested = True
 
+if __name__ == "__main__":
+    import logging
+    import sys
+    import traceback
+
+    # --- Custom FileHandler that flushes after every log message ---
+    class FlushFileHandler(logging.FileHandler):
+        def emit(self, record):
+            super().emit(record)
+            self.flush()
+
+    # --- Set up logging ---
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+
+    # File handler (immediate flush)
+    file_handler = FlushFileHandler('tool_process.log', mode='a', encoding='utf-8', delay=False)
+    file_handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
+    # Console handler (optional, for real-time feedback)
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    console.setFormatter(formatter)
+    logger.addHandler(console)
+
+    # --- Example log messages (remove or keep as needed) ---
+    logging.info("Tool started")
+    logging.debug("Debugging info")
+    logging.warning("A warning")
+    logging.error("An error")
+
+    # --- Uncaught exception handler ---
     def log_uncaught_exceptions(exctype, value, tb):
         error_msg = "".join(traceback.format_exception(exctype, value, tb))
         logging.error("Uncaught exception:\n%s", error_msg)
         from PyQt5.QtWidgets import QMessageBox
         QMessageBox.critical(None, "Unexpected Error",
             "An unexpected error occurred:\n\n" + str(value) +
-            "\n\nSee tool_error.log for details.")
+            "\n\nSee tool_process.log for details.")
 
     sys.excepthook = log_uncaught_exceptions
 
+    # --- Start the PyQt5 application ---
     from PyQt5.QtWidgets import QApplication
     app = QApplication(sys.argv)
     win = LogTriageWindow()
