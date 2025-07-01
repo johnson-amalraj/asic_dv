@@ -1,5 +1,6 @@
 --------------------------------------------------------------------------------------------------------------
 # Areas for Improvement & Suggestions
+--------------------------------------------------------------------------------------------------------------
 
 # 1. Code Structure & Maintainability
 
@@ -14,6 +15,9 @@
 - Class/Function Length:  
   Some methods (e.g., `init_menus`, `apply_filters`, `export_to_csv`) are very long. Break them into smaller helper functions for readability.
 
+- Type Hints:
+  Use Python type hints for function signatures to improve readability and help with static analysis.
+
 ## 2. UI/UX
 
 - Table Performance:  
@@ -24,6 +28,19 @@
 
 - Column Indexing:  
   There’s a lot of manual index calculation for columns (especially with Excluded/Comments). This is error-prone. Consider using namedtuples or dataclasses for rows, or always referencing columns by name.
+
+- Resizable Columns:
+  Consider saving/restoring column order as well as width.
+
+- Advanced Filtering:
+  Add support for AND/OR logic in filters, or a global search box.
+
+- Visualization:
+  Allow exporting all charts at once.
+  Add more chart types (e.g., time series if logs have timestamps).
+
+- Accessibility:
+  Ensure color choices are accessible (e.g., for colorblind users).
 
 ## 3. Data Handling
 
@@ -44,6 +61,8 @@
 - Thread Safety:  
   The worker thread emits signals to update the UI, which is correct. Ensure that all UI updates are done in the main thread.
 
+- In parse_log_file, the error/fatal/warning counts are incremented twice (once by Counter, once in the loop). This may be a bug—review this logic.
+
 ## 5. Code Quality
 
 - Magic Numbers/Strings:  
@@ -51,17 +70,16 @@
 
 - Repeated Code:  
   There’s some repeated logic (e.g., for exporting/importing CSVs, updating recent folders). Refactor into reusable functions.
+  Some code (e.g., color setting, tooltips) is repeated in multiple places. Consider helper functions.
 
 - Unused Imports:  
   Some imports (e.g., `QWidgetAction`, `QToolBar`) are not used. Remove unused imports.
 
 - Logging:  
-  You log errors to `tool_error.log`, which is good. Consider also logging user actions for audit/debugging.
+  Use logger instead of the root logging module for all log calls (e.g., logger.info(...)).
+  Consider rotating log files if they get large.
 
 ## 6. Functionality
-
-- External Editor:  
-  The `open_log_file` method uses `gvim`. Make this configurable, or use the system default editor.
 
 - Regex Filtering:  
   Only the Find dialog supports regex. Consider adding regex support to column filters.
@@ -72,9 +90,32 @@
 - Memory Usage:  
   For very large log sets, consider lazy loading or paging.
 
---------------------------------------------------------------------------------------------------------------
+## 7. User Experience
 
+- Filter Row Usability:
+  Consider adding a "Clear All Filters" button.
+  Add tooltips to filter boxes explaining supported syntax (e.g., for numeric filters).
+
+- Session File Format:
+  Consider using a more robust format (e.g., JSON or SQLite) for session files, especially if you plan to extend features.
+
+- Error Feedback:
+  When loading fails (e.g., bad patterns file), consider showing the error in a dedicated error dialog with details and possible fixes.
+
+- Dark Mode Persistence:
+  Save the dark mode setting in QSettings so it persists across sessions.
+
+## 8. Documentation
+
+- User Guide:
+  Consider generating a user guide (even as a markdown file) from your features dialog content.
+
+- Developer Guide:
+  Document how to add new log patterns, extend the UI, or add new export formats.
+
+--------------------------------------------------------------------------------------------------------------
 # Minor Issues & Typos
+--------------------------------------------------------------------------------------------------------------
 
 - In `parse_log_file`, the VCS patterns use `$$` in regex, which is not a valid regex syntax. Double-check these patterns.
 - In `apply_filters`, the logic for Excluded column is a bit convoluted. Simplify or document.
@@ -83,8 +124,8 @@
 - In `toggle_dark_mode`, the stylesheet is hardcoded. Consider loading from a file or resource.
 
 --------------------------------------------------------------------------------------------------------------
-
 # Future Ideas
+--------------------------------------------------------------------------------------------------------------
 
     - Tagging System: Allow users to tag log entries for categorization.
     - Bulk Commenting: When adding comments, apply them to all rows with the same message.
@@ -92,5 +133,8 @@
     - Command Line Interface (CLI): For users who prefer scripting or automation.
     - Auto-Triage Suggestions: Use simple heuristics or ML to suggest likely causes or group similar issues.
     - Integration Hooks: Allow integration with bug tracking tools (e.g., JIRA) or CI/CD pipelines.
+    - Plugin System: Allow users to add custom log parsers or visualizations.
+    - Remote Log Loading: Support loading logs from remote servers.
+    - Automated Report Generation: Generate PDF/HTML reports from filtered data.
 
 --------------------------------------------------------------------------------------------------------------
