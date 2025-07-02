@@ -7,22 +7,38 @@ import logging
 import traceback
 import psutil
 import matplotlib
+import matplotlib.style
 
 from collections import Counter, defaultdict
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QFileDialog, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
-    QHBoxLayout, QLineEdit, QLabel, QProgressBar, QMenuBar, QMenu, QAction, QMessageBox,
-    QAbstractItemView, QHeaderView, QStatusBar, QDialog, QPushButton, QInputDialog, QMenu, QTextEdit, QToolBar, 
-    QCheckBox, QWidgetAction
+    QApplication, QMainWindow, QFileDialog, QTableWidget, QTableWidgetItem, QVBoxLayout, 
+    QWidget, QHBoxLayout, QLineEdit, QLabel, QProgressBar, QMenuBar, QMenu, QAction, 
+    QMessageBox, QAbstractItemView, QHeaderView, QStatusBar, QDialog, QPushButton, 
+    QInputDialog, QMenu, QTextEdit, QCheckBox, QComboBox
 )
+
 from PyQt5.QtCore import Qt, QSettings, QThread, pyqtSignal, QSize
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from dataclasses import dataclass
+from functools import partial
+
+@dataclass
+class LogRow:
+    id: str
+    testcase: str
+    testopt: str
+    type: str 
+    count: int
+    message: str
+    logtype: str
+    logfilepath: str
+    linenumber: int
 
 matplotlib.use('Qt5Agg')
 
-SETTINGS_ORG = "LogTriage"
-SETTINGS_APP = "LogTriageApp"
+MAX_RECENT_FOLDERS = 5
+ROW_KEY_LEN = 8
 
 RECENT_FOLDERS_KEY = "recentFolders"
 EXCLUSION_LIST_KEY = "exclusionList"
@@ -30,8 +46,6 @@ LAST_FOLDER_KEY = "lastFolder"
 COL_WIDTHS_KEY = "colWidths"
 WIN_SIZE_KEY = "winSize"
 WIN_POS_KEY = "winPos"
-
-MAX_RECENT_FOLDERS = 5
 
 def parse_count_filter(expr, value):
     try:
@@ -85,9 +99,14 @@ def load_patterns_from_file(patterns_file):
     return patterns
 
 def parse_log_file(filepath, patterns):
+    logger.info(f"Start parsing: {filepath}")
     errors, fatals, warnings = [], [], []
     with open_log_file_anytype(filepath) as f:
         for lineno, line in enumerate(f, 1):
+            # process line
+            if lineno % 10000 == 0:
+                # emit progress signal or update status bar
+                logger.info(f"Processed {lineno} lines in {filepath}")
             line_stripped = line.strip()
             for typ, pat in patterns:
                 m = pat.search(line_stripped)
@@ -112,6 +131,7 @@ def parse_log_file(filepath, patterns):
     error_counts = Counter(errors)
     fatal_counts = Counter(fatals)
     warning_counts = Counter(warnings)
+    logger.info(f"Finished parsing: {filepath}")
     return error_counts, fatal_counts, warning_counts
 
 def is_uvm_summary_line(line):
@@ -144,22 +164,24 @@ def extract_log_info(filepath):
 
 def group_rows(rows):
     # Group by (Test Case, Test Option, Type, Message, Log Type)
-    grouped = defaultdict(lambda: [None, None, None, None, 0, None, None, None, None])
+    grouped = {}
     for row in rows:
-        # Key: (Test Case, Test Option, Type, Message, Log Type)
-        key = (row[1], row[2], row[3], row[5], row[6])
-        if grouped[key][0] is None:
-            grouped[key][0] = row[0]  # ID (first one)
-            grouped[key][1] = row[1]  # Test Case
-            grouped[key][2] = row[2]  # Test Option
-            grouped[key][3] = row[3]  # Type
-            grouped[key][4] = 0       # Count (sum)
-            grouped[key][5] = row[5]  # Message
-            grouped[key][6] = row[6]  # Log Type
-            grouped[key][7] = row[7]  # Log File Path
-            grouped[key][8] = row[8] if len(row) > 8 else ""  # Comments, if present
-        grouped[key][4] += int(row[4])  # Sum Count
-    return list(grouped.values())
+        key = (row.testcase, row.testopt, row.type, row.message, row.logtype)
+        if key not in grouped:
+            grouped[key] = {
+                "id": row.id,
+                "testcase": row.testcase,
+                "testopt": row.testopt,
+                "type": row.type,
+                "count": 0,
+                "message": row.message,
+                "logtype": row.logtype,
+                "logfilepath": row.logfilepath,
+                "linenumber": row.linenumber
+            }
+        grouped[key]["count"] += int(row.count)
+    # Convert back to LogRow objects
+    return [LogRow(**v) for v in grouped.values()]
 
 def get_memory_usage_mb():
     process = psutil.Process(os.getpid())
@@ -197,10 +219,138 @@ class ChartDialog(QDialog):
             try:
                 self.canvas.figure.savefig(path)
                 QMessageBox.information(self, "Export", f"Chart exported to {path}")
-                logging.info(f"Chart exported to {path}.")
+                logger.info(f"Chart exported to {path}.")
             except Exception as e:
                 QMessageBox.critical(self, "Export Error", f"Failed to export chart:\n{e}")
-                logging.error(f"Export Error", f"Failed to export chart:{e}")
+                logger.error(f"Export Error", f"Failed to export chart:{e}")
+
+class VisualizationDialog(QDialog):
+    def __init__(self, parent, get_chart_data, dark_mode_enabled):
+        super().__init__(parent)
+        self.setWindowTitle("Visualization")
+        self.resize(900, 600)
+        self.get_chart_data = get_chart_data
+        self.dark_mode_enabled = dark_mode_enabled
+
+        # Chart type selector
+        self.chart_combo = QComboBox(self)
+        self.chart_combo.addItems(["Pie Chart", "Grouped Bar Chart", "Heatmap"])
+        self.chart_combo.currentIndexChanged.connect(self.update_chart)
+
+        # Chart area
+        self.fig = Figure(figsize=(8, 6), facecolor=('#232629' if dark_mode_enabled else 'white'))
+        self.canvas = FigureCanvas(self.fig)
+
+        # Export and close buttons
+        btn_layout = QHBoxLayout()
+        export_btn = QPushButton("Export as Image", self)
+        export_btn.clicked.connect(self.export_image)
+        btn_layout.addWidget(export_btn)
+        close_btn = QPushButton("Close", self)
+        close_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(close_btn)
+
+        # Layout
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.chart_combo)
+        layout.addWidget(self.canvas)
+        layout.addLayout(btn_layout)
+
+        # Set dark mode for Matplotlib
+        self.set_matplotlib_style(dark_mode_enabled)
+
+        # Draw initial chart
+        self.update_chart()
+
+        # Set dialog background for dark mode
+        if dark_mode_enabled:
+            self.setStyleSheet("background-color: #232629; color: #F0F0F0;")
+
+    def set_matplotlib_style(self, dark):
+        import matplotlib
+        matplotlib.style.use('dark_background' if dark else 'default')
+
+    def update_chart(self):
+        chart_type = self.chart_combo.currentText()
+        self.fig.clf()
+        ax = self.fig.add_subplot(111)
+        if chart_type == "Pie Chart":
+            self.plot_pie(ax)
+        elif chart_type == "Grouped Bar Chart":
+            self.plot_bar(ax)
+        elif chart_type == "Heatmap":
+            self.plot_heatmap(ax)
+        self.canvas.draw()
+
+    def plot_pie(self, ax):
+        stats, _ = self.get_chart_data()
+        labels = []
+        sizes = []
+        colors = ['#e74c3c', '#8e44ad', '#f1c40f']
+        for i, typ in enumerate(["ERROR", "FATAL", "WARNING"]):
+            if stats[typ] > 0:
+                labels.append(f"{typ} ({stats[typ]})")
+                sizes.append(stats[typ])
+        if sizes:
+            ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=140, colors=colors[:len(sizes)])
+            ax.set_title("Distribution of Error Types")
+        else:
+            ax.text(0.5, 0.5, "No data", ha='center', va='center')
+
+    def plot_bar(self, ax):
+        _, bar_data = self.get_chart_data()
+        testcases, data = bar_data['testcases'], bar_data['data']
+        types = ["ERROR", "FATAL", "WARNING"]
+        x = range(len(testcases))
+        width = 0.25
+        colors = ['#e74c3c', '#8e44ad', '#f1c40f']
+        for i, typ in enumerate(types):
+            ax.bar([xi + i*width - width for xi in x], [data[tc][typ] for tc in testcases], width, label=typ, color=colors[i])
+        ax.set_xticks(x)
+        ax.set_xticklabels(testcases, rotation=45, ha='right')
+        ax.set_ylabel("Count")
+        ax.set_xlabel("Test Case")
+        ax.set_title("Error/Fatal/Warning Counts by Test Case")
+        ax.legend()
+        self.fig.tight_layout()
+
+    def plot_heatmap(self, ax):
+        import numpy as np
+        _, bar_data = self.get_chart_data()
+        testcases, data = bar_data['testcases'], bar_data['data']
+        types = ["ERROR", "FATAL", "WARNING"]
+        arr = np.array([[data[tc][typ] for typ in types] for tc in testcases])
+        if not np.any(arr):
+            ax.text(0.5, 0.5, "No data", ha='center', va='center')
+            return
+        cax = ax.imshow(arr, aspect='auto', cmap='viridis')
+        ax.set_xticks(np.arange(len(types)))
+        ax.set_xticklabels(types)
+        ax.set_yticks(np.arange(len(testcases)))
+        ax.set_yticklabels(testcases)
+        ax.set_xlabel("Error Type")
+        ax.set_ylabel("Test Case")
+        ax.set_title("Heatmap of Error Frequency by Test Case")
+        self.fig.colorbar(cax, ax=ax, label="Count")
+        for i in range(arr.shape[0]):
+            for j in range(arr.shape[1]):
+                count = arr[i, j]
+                if count > 0:
+                    ax.text(j, i, str(count), ha='center', va='center',
+                            color='white' if count > arr.max()/2 else 'black',
+                            fontsize=10, fontweight='bold')
+        self.fig.tight_layout()
+
+    def export_image(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Export Chart as Image", "", "PNG Files (*.png);;JPEG Files (*.jpg);;All Files (*)")
+        if path:
+            try:
+                self.fig.savefig(path)
+                QMessageBox.information(self, "Export", f"Chart exported to {path}")
+                logger.info(f"Chart exported to {path}.")
+            except Exception as e:
+                QMessageBox.critical(self, "Export Error", f"Failed to export chart:\n{e}")
+                logger.error(f"Export Error", f"Failed to export chart:{e}")
 
 class FeaturesDialog(QDialog):
     def __init__(self, parent=None):
@@ -292,7 +442,7 @@ class ExclusionListDialog(QDialog):
 
         # Add count label
         count_label = QLabel(f"Total excluded messages: {len(exclusion_list)}")
-        logging.info(f"Total excluded messages: {len(exclusion_list)}.")
+        logger.info(f"Total excluded messages: {len(exclusion_list)}.")
         layout.addWidget(count_label)
 
         self.table = QTableWidget(len(exclusion_list), 1)
@@ -354,7 +504,7 @@ class FindDialog(QDialog):
                 pattern = None
         except re.error as e:
             QMessageBox.warning(self, "Regex Error", f"Invalid regex pattern:\n{e}")
-            logging.error(f"Regex Error, Invalid regex pattern:{e}.")
+            logger.error(f"Regex Error, Invalid regex pattern:{e}.")
             return
 
         for i in range(self.table.rowCount()):
@@ -376,7 +526,7 @@ class FindDialog(QDialog):
             self.current = 0
         else:
             QMessageBox.information(self, "Find", "No matches found.")
-            logging.warning(f"Find", "No matches found.")
+            logger.warning(f"Find", "No matches found.")
 
     def find_next(self):
         if not self.matches:
@@ -416,6 +566,7 @@ class SummaryDialog(QDialog):
         layout.addWidget(export_btn)
 
     def apply_filters(self):
+        self.update_comments_dict_from_table()
         filters = [edit.text().strip().lower() for edit in self.filters]
         self.filtered_rows = []
         for row in self.all_rows:
@@ -445,16 +596,16 @@ class SummaryDialog(QDialog):
                 writer = csv.writer(f)
                 writer.writerow([self.table.horizontalHeaderItem(i).text() for i in range(self.table.columnCount())])
                 for i in range(self.table.rowCount()):
-                    row = [self.table.item(i, j).text() if self.table.item(i, j) else "" for j in range(self.table.columnCount())]
+                    row = [self.table.item(i, j).text() for j in range(self.table.columnCount())]
                     writer.writerow(row)
             if self.statusbar:
                 self.statusbar.showMessage(f"Summary exported to {path}")
-                logging.info(f"Summary exported to {path}.")
+                logger.info(f"Summary exported to {path}.")
             QMessageBox.information(self, "Export", f"Summary exported to {path}")
         except Exception as e:
             if self.statusbar:
                 self.statusbar.showMessage(f"Failed to export summary: {e}")
-                logging.error(f"Failed to export summary: {e}.")
+                logger.error(f"Failed to export summary: {e}.")
             QMessageBox.critical(self, "Export Error", f"Failed to export summary:\n{e}")
 
 class CommentEditDialog(QDialog):
@@ -482,6 +633,7 @@ class LogTriageWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.patterns_file = os.path.join(os.path.dirname(__file__), "patterns.csv")
+        logger.info(f"Loading {self.patterns_file} for pattern search...")
         self.patterns = load_patterns_from_file(self.patterns_file)
         self.is_loading = False
         self.stop_requested = False
@@ -538,7 +690,7 @@ class LogTriageWindow(QMainWindow):
         self.filter_edits = []
         for i, col in enumerate(self.columns):
             edit = QLineEdit()
-            edit.setPlaceholderText(f"Filter {col}")
+            edit.setPlaceholderText(f"Filter {col} (use | for OR)")
             edit.textChanged.connect(self.apply_filters)
             filter_layout.addWidget(edit)
             self.filter_edits.append(edit)
@@ -596,6 +748,13 @@ class LogTriageWindow(QMainWindow):
         self.find_action.triggered.connect(self.show_find_dialog)
         self.addAction(self.find_action)
 
+    def commit_active_editor(self):
+        """If a cell editor is open, commit its data before refreshing the table."""
+        if self.table.state() == QAbstractItemView.EditingState:
+            self.table.closePersistentEditor(self.table.currentItem())
+            self.table.clearFocus()
+            QApplication.processEvents()
+
     def load_patterns_file(self):
         path, _ = QFileDialog.getOpenFileName(self, "Load Patterns File", os.getcwd(), "CSV Files (*.csv)")
         if not path:
@@ -604,6 +763,7 @@ class LogTriageWindow(QMainWindow):
             self.patterns = load_patterns_from_file(path)
             self.patterns_file = path
             QMessageBox.information(self, "Patterns Loaded", f"Patterns loaded from {path}")
+            self.statusbar.showMessage("Patterns Loaded", f"Patterns loaded from {path}.")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load patterns file:\n{e}")
 
@@ -624,7 +784,7 @@ class LogTriageWindow(QMainWindow):
             self.worker.stop()
             self.stop_btn.setEnabled(False)
             self.statusbar.showMessage("Loading stopped by user. Waiting for worker to finish...")
-            logging.info(f"Loading stopped by user. Waiting for worker to finish...")
+            logger.info(f"Loading stopped by user. Waiting for worker to finish...")
         # Do not update the table here; wait for on_parse_finished
 
     def load_recent_folders(self):
@@ -685,13 +845,8 @@ class LogTriageWindow(QMainWindow):
     def handle_comment_edit(self, item):
         comments_col = self.columns.index("Comments")
         if item.column() == comments_col:
-            # Get the row's unique key (excluding Comments)
-            row_data = []
-            for col in range(len(self.columns) - 1):
-                cell = self.table.item(item.row(), col)
-                row_data.append(cell.text() if cell else "")
-            row_key = tuple(row_data)
-            # Store the entire comment (multi-line)
+            # Get the row key from the first column's UserRole
+            row_key = self.table.item(item.row(), 0).data(Qt.UserRole)
             self.comments_dict[row_key] = item.text()
 
     def toggle_show_only_excluded(self):
@@ -713,159 +868,28 @@ class LogTriageWindow(QMainWindow):
     def update_selection_status(self):
         selected_rows = {item.row() for item in self.table.selectedItems()}
         self.statusbar.showMessage(f"{len(selected_rows)} row(s) selected.")
+        logger.info(f"{len(selected_rows)} row(s) selected.")
 
-    def show_pie_chart(self):
-        from matplotlib.figure import Figure
-        from PyQt5.QtWidgets import QComboBox
-    
-        testcases = sorted({row[1] for row in self.filtered_rows})
-        combo = QComboBox()
-        combo.addItem("All Test Cases")
-        combo.addItems(testcases)
-    
-        def plot_pie(ax):
-            selected_tc = combo.currentText()
-            stats = {"ERROR": 0, "FATAL": 0, "WARNING": 0}
-            for row in self.filtered_rows:
-                if selected_tc != "All Test Cases" and row[1] != selected_tc:
-                    continue
-                if row[3] in stats:
-                    stats[row[3]] += int(row[4])
-            labels = []
-            sizes = []
-            for typ in ["ERROR", "FATAL", "WARNING"]:
-                if stats[typ] > 0:
-                    labels.append(f"{typ} ({stats[typ]})")
-                    sizes.append(stats[typ])
-            if sizes:
-                ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=140, colors=['#e74c3c', '#8e44ad', '#f1c40f'])
-                ax.set_title("Distribution of Error Types")
-            else:
-                ax.text(0.5, 0.5, "No data", ha='center', va='center')
-    
-        fig = Figure(figsize=(5, 4))
-        ax = fig.add_subplot(111)
-        plot_pie(ax)
-    
-        def on_filter_change():
-            fig.clf()
-            ax = fig.add_subplot(111)
-            plot_pie(ax)
-            dialog.canvas.draw()
-    
-        dialog = ChartDialog(fig, "Pie Chart: Error Types", self, filter_widgets=[combo], on_filter_change=on_filter_change)
-        dialog.exec_()
+    def show_visualization_dialog(self):
+        dlg = VisualizationDialog(self, self.get_visualization_data, self.dark_mode_action.isChecked())
+        dlg.exec_()
 
-    def show_heatmap_chart(self):
-        import numpy as np
-        from PyQt5.QtWidgets import QComboBox
-    
-        testcases = sorted({row[1] for row in self.filtered_rows})
-        types = ["ERROR", "FATAL", "WARNING"]
-        data = np.zeros((len(testcases), len(types)), dtype=int)
-        tc_idx = {tc: i for i, tc in enumerate(testcases)}
-        typ_idx = {typ: i for i, typ in enumerate(types)}
+    def get_visualization_data(self):
+        # Pie chart data
+        stats = {"ERROR": 0, "FATAL": 0, "WARNING": 0}
         for row in self.filtered_rows:
-            tc = row[1]
-            typ = row[3]
-            if tc in tc_idx and typ in typ_idx:
-                data[tc_idx[tc], typ_idx[typ]] += int(row[4])
-        if not np.any(data):
-            QMessageBox.information(self, "Heatmap", "No error/warning/fatal data to plot.")
-            return
-    
-        colormaps = ['viridis', 'plasma', 'inferno', 'magma', 'cividis', 'hot', 'OrRd', 'YlOrRd']
-        cmap_combo = QComboBox()
-        cmap_combo.addItems(colormaps)
-        cmap_combo.setCurrentText('viridis')
-    
-        fig = Figure(figsize=(8, 6))
-        ax = fig.add_subplot(111)
-        colorbar = [None]
-    
-        def plot_heatmap(ax, cmap_name):
-            ax.clear()
-            cax = ax.imshow(data, aspect='auto', cmap=cmap_name)
-            ax.set_xticks(np.arange(len(types)))
-            ax.set_xticklabels(types)
-            ax.set_yticks(np.arange(len(testcases)))
-            ax.set_yticklabels(testcases)
-            ax.set_xlabel("Error Type")
-            ax.set_ylabel("Test Case")
-            ax.set_title("Heatmap of Error Frequency by Test Case")
-            if colorbar[0] is not None:
-                colorbar[0].remove()
-            colorbar[0] = fig.colorbar(cax, ax=ax, label="Count")
-            fig.tight_layout()
-            # Annotate each cell with the count
-            for i in range(data.shape[0]):
-                for j in range(data.shape[1]):
-                    count = data[i, j]
-                    if count > 0:
-                        ax.text(j, i, str(count), ha='center', va='center',
-                                color='white' if count > data.max()/2 else 'black',
-                                fontsize=10, fontweight='bold')
-    
-        plot_heatmap(ax, cmap_combo.currentText())
-    
-        def on_cmap_change():
-            plot_heatmap(ax, cmap_combo.currentText())
-            dialog.canvas.draw()
-    
-        cmap_combo.currentIndexChanged.connect(on_cmap_change)
-    
-        dialog = ChartDialog(fig, "Heatmap: Error Frequency", self, filter_widgets=[cmap_combo])
-        dialog.exec_()
-
-    def show_grouped_bar_chart(self):
-        import numpy as np
-        from PyQt5.QtWidgets import QComboBox
-    
-        testcases = sorted({row[1] for row in self.filtered_rows})
+            if row.type in stats:
+                stats[row.type] += int(row.count)
+        # Bar/heatmap data
+        testcases = sorted({row.testcase for row in self.filtered_rows})
         types = ["ERROR", "FATAL", "WARNING"]
-        data = np.zeros((len(testcases), len(types)), dtype=int)
-        tc_idx = {tc: i for i, tc in enumerate(testcases)}
-        typ_idx = {typ: i for i, typ in enumerate(types)}
+        data = {tc: {typ: 0 for typ in types} for tc in testcases}
         for row in self.filtered_rows:
-            tc = row[1]
-            typ = row[3]
-            if tc in tc_idx and typ in typ_idx:
-                data[tc_idx[tc], typ_idx[typ]] += int(row[4])
-        if not np.any(data):
-            QMessageBox.information(self, "Bar Chart", "No error/warning/fatal data to plot.")
-            return
-    
-        fig = Figure(figsize=(10, 6))
-        ax = fig.add_subplot(111)
-        x = np.arange(len(testcases))
-        width = 0.25
-    
-        colors = ['#e74c3c', '#8e44ad', '#f1c40f']  # ERROR, FATAL, WARNING
-        bars = []
-        for i, typ in enumerate(types):
-            bars.append(ax.bar(x + i*width - width, data[:, i], width, label=typ, color=colors[i]))
-    
-        ax.set_xticks(x)
-        ax.set_xticklabels(testcases, rotation=45, ha='right')
-        ax.set_ylabel("Count")
-        ax.set_xlabel("Test Case")
-        ax.set_title("Error/Fatal/Warning Counts by Test Case")
-        ax.legend()
-        fig.tight_layout()
-    
-        # Annotate bars with counts
-        for bar_group in bars:
-            for bar in bar_group:
-                height = bar.get_height()
-                if height > 0:
-                    ax.annotate(f'{int(height)}',
-                                xy=(bar.get_x() + bar.get_width() / 2, height),
-                                xytext=(0, 3),  # 3 points vertical offset
-                                textcoords="offset points",
-                                ha='center', va='bottom', fontsize=9, fontweight='bold')
-    
-        dialog = ChartDialog(fig, "Grouped Bar Chart: Error Types by Test Case", self)
-        dialog.exec_()
+            tc = row.testcase
+            typ = row.type
+            if tc in data and typ in data[tc]:
+                data[tc][typ] += int(row.count)
+        return stats, {"testcases": testcases, "data": data}
 
     def get_message_stats(self):
         """
@@ -877,9 +901,9 @@ class LogTriageWindow(QMainWindow):
             "WARNING": {"total": 0, "unique": set()},
         }
         for row in self.filtered_rows:
-            typ = row[3]
-            count = int(row[4])
-            msg = row[5]
+            typ = row.type
+            count = int(row.count)
+            msg = row.message
             if typ in stats:
                 stats[typ]["total"] += count
                 stats[typ]["unique"].add(msg)
@@ -902,6 +926,12 @@ class LogTriageWindow(QMainWindow):
         reload_action.triggered.connect(self.reload_last_folder)
         file_menu.addAction(reload_action)
     
+        file_menu.addSeparator()
+        load_patterns_action = QAction("Load Patterns File...", self)
+        load_patterns_action.setShortcut("Ctrl+P")
+        load_patterns_action.triggered.connect(self.load_patterns_file)
+        file_menu.addAction(load_patterns_action)  # or settings_menu.addAction(...)
+
         export_action = QAction("Export to CSV", self)
         export_action.setShortcut("Ctrl+E")
         export_action.triggered.connect(self.export_to_csv)
@@ -935,11 +965,34 @@ class LogTriageWindow(QMainWindow):
         columns_menu = self.menu.addMenu("&Columns")
         self.column_actions = []
         for i, col in enumerate(self.columns):
+            if col == "Line Number":
+                continue  # Skip adding "Line Number" to the Columns menu
             act = QAction(col, self, checkable=True)
             act.setChecked(True)
-            act.triggered.connect(lambda checked, idx=i: self.toggle_column(idx, checked))
+            act.triggered.connect(partial(self.toggle_column, i))
             columns_menu.addAction(act)
             self.column_actions.append(act)
+
+        # Log menu
+        log_menu = self.menu.addMenu("&Log")
+        self.simulate_action = QAction("Show simulate.log", self, checkable=True)
+        self.simulate_action.setChecked(True)
+        self.simulate_action.setShortcut("Ctrl+1")
+        self.simulate_action.triggered.connect(self.toggle_simulate)
+        log_menu.addAction(self.simulate_action)
+    
+        self.compile_action = QAction("Show compile.log", self, checkable=True)
+        self.compile_action.setChecked(True)
+        self.compile_action.setShortcut("Ctrl+2")
+        self.compile_action.triggered.connect(self.toggle_compile)
+        log_menu.addAction(self.compile_action)
+    
+        log_menu.addSeparator()
+        self.scoreboard_action = QAction("Show Scoreboard Errors", self, checkable=True)
+        self.scoreboard_action.setChecked(True)
+        self.scoreboard_action.setShortcut("Ctrl+3")
+        self.scoreboard_action.triggered.connect(self.toggle_scoreboard)
+        log_menu.addAction(self.scoreboard_action)
     
         # Exclusion menu
         exclusion_menu = self.menu.addMenu("&Exclusion")
@@ -968,6 +1021,7 @@ class LogTriageWindow(QMainWindow):
         clear_excl_action.triggered.connect(self.clear_exclusion)
         exclusion_menu.addAction(clear_excl_action)
     
+        file_menu.addSeparator()
         self.show_only_excluded_action = QAction("Show Only Excluded Rows", self, checkable=True)
         self.show_only_excluded_action.setShortcut("Ctrl+Shift+X")
         self.show_only_excluded_action.setChecked(False)
@@ -979,32 +1033,20 @@ class LogTriageWindow(QMainWindow):
         self.show_only_nonexcluded_action.setChecked(False)
         self.show_only_nonexcluded_action.triggered.connect(self.toggle_show_only_nonexcluded)
         exclusion_menu.addAction(self.show_only_nonexcluded_action)
+        file_menu.addSeparator()
     
-        # Log menu
-        log_menu = self.menu.addMenu("&Log")
-        self.simulate_action = QAction("Show simulate.log", self, checkable=True)
-        self.simulate_action.setChecked(True)
-        self.simulate_action.setShortcut("Ctrl+1")
-        self.simulate_action.triggered.connect(self.toggle_simulate)
-        log_menu.addAction(self.simulate_action)
+        # Session menu
+        session_menu = self.menu.addMenu("&Session")
+        save_session_action = QAction("Save Session", self)
+        save_session_action.setShortcut("Ctrl+Shift+S")
+        save_session_action.triggered.connect(self.save_session)
+        session_menu.addAction(save_session_action)
     
-        self.compile_action = QAction("Show compile.log", self, checkable=True)
-        self.compile_action.setChecked(True)
-        self.compile_action.setShortcut("Ctrl+2")
-        self.compile_action.triggered.connect(self.toggle_compile)
-        log_menu.addAction(self.compile_action)
+        load_session_action = QAction("Load Session", self)
+        load_session_action.setShortcut("Ctrl+Shift+O")
+        load_session_action.triggered.connect(self.load_session)
+        session_menu.addAction(load_session_action)
     
-        log_menu.addSeparator()
-        self.scoreboard_action = QAction("Show Scoreboard Errors", self, checkable=True)
-        self.scoreboard_action.setChecked(True)
-        self.scoreboard_action.setShortcut("Ctrl+3")
-        self.scoreboard_action.triggered.connect(self.toggle_scoreboard)
-        log_menu.addAction(self.scoreboard_action)
-    
-        load_patterns_action = QAction("Load Patterns File...", self)
-        load_patterns_action.triggered.connect(self.load_patterns_file)
-        file_menu.addAction(load_patterns_action)  # or settings_menu.addAction(...)
-
         # Summary menu
         summary_menu = self.menu.addMenu("&Summary")
         show_summary_action = QAction("Show Summary", self)
@@ -1018,18 +1060,6 @@ class LogTriageWindow(QMainWindow):
         show_row_stats_action.triggered.connect(self.show_row_stats)
         summary_menu.addAction(show_row_stats_action)
 
-        # Session menu
-        session_menu = self.menu.addMenu("&Session")
-        save_session_action = QAction("Save Session", self)
-        save_session_action.setShortcut("Ctrl+Shift+S")
-        save_session_action.triggered.connect(self.save_session)
-        session_menu.addAction(save_session_action)
-    
-        load_session_action = QAction("Load Session", self)
-        load_session_action.setShortcut("Ctrl+Shift+O")
-        load_session_action.triggered.connect(self.load_session)
-        session_menu.addAction(load_session_action)
-    
         # Settings menu
         settings_menu = self.menu.addMenu("&Settings")
         self.dark_mode_action = QAction("Dark Mode", self, checkable=True)
@@ -1040,18 +1070,10 @@ class LogTriageWindow(QMainWindow):
     
         # Visualization menu
         visual_menu = self.menu.addMenu("&Visualization")
-        pie_action = QAction("Pie Chart: Error Types", self)
-        pie_action.triggered.connect(self.show_pie_chart)
-        visual_menu.addAction(pie_action)
-        
-        heatmap_action = QAction("Heatmap: Error Frequency", self)
-        heatmap_action.triggered.connect(self.show_heatmap_chart)
-        visual_menu.addAction(heatmap_action)
-
-        # In your init_menus() under Visualization menu:
-        bar_action = QAction("Grouped Bar Chart: Error Types by Test Case", self)
-        bar_action.triggered.connect(self.show_grouped_bar_chart)
-        visual_menu.addAction(bar_action)
+        visualize_action = QAction("Open Visualization Window", self)
+        visualize_action.setShortcut("Ctrl+T")
+        visualize_action.triggered.connect(self.show_visualization_dialog)
+        visual_menu.addAction(visualize_action)
 
         # Help menu
         help_menu = self.menu.addMenu("&Help")
@@ -1090,7 +1112,7 @@ class LogTriageWindow(QMainWindow):
     def load_log_folder(self, folder=None):
         if self.is_loading:
             QMessageBox.warning(self, "Loading in Progress", "A folder is already being loaded. Please wait until it finishes or stop the current load.")
-            logging.warning(f"Loading in Progress", "A folder is already being loaded. Please wait until it finishes or stop the current load.")
+            logger.warning(f"Loading in Progress", "A folder is already being loaded. Please wait until it finishes or stop the current load.")
             return
         self.is_loading = True
         self.set_loading_ui(True)
@@ -1104,7 +1126,7 @@ class LogTriageWindow(QMainWindow):
             folder = folder.strip()
         if not os.path.isdir(folder):
             QMessageBox.warning(self, "Invalid Path", f"The path '{folder}' is not a valid directory.")
-            logging.warning(f"Invalid Path", f"The path '{folder}' is not a valid directory.")
+            logger.warning(f"Invalid Path", f"The path '{folder}' is not a valid directory.")
             self.is_loading = False
             self.set_loading_ui(False)
             return
@@ -1122,7 +1144,7 @@ class LogTriageWindow(QMainWindow):
                         log_files.append(os.path.join(root, fname))
         if not log_files:
             self.statusbar.showMessage("No valid log files found in the selected folder.")
-            logging.warning(f"No valid log files found in the selected folder.")
+            logger.warning(f"No valid log files found in the selected folder.")
             self.progress.setMaximum(1)
             self.progress.setValue(1)
             self.progress.setFormat("No log files found.")
@@ -1134,7 +1156,7 @@ class LogTriageWindow(QMainWindow):
         self.progress.setFormat(f"Loading 0/{len(log_files)} files...")
     
         self.statusbar.showMessage(f"Loading log file folder path: {folder} ...")
-        logging.info(f"Loading log file folder path: {folder} ...")
+        logger.info(f"Loading log file folder path: {folder} ...")
     
         self.stop_requested = False
         self.worker = LogParseWorker(log_files, self.show_simulate, self.show_compile, self.show_scoreboard, self.patterns)
@@ -1152,29 +1174,40 @@ class LogTriageWindow(QMainWindow):
         self.set_loading_ui(False)
         self.progress.setValue(self.progress.maximum())
         self.progress.setFormat(f"Loaded {self.progress.value()}/{self.progress.maximum()} files.")
-        logging.info(f"Loaded {self.progress.value()}/{self.progress.maximum()} files.")
+        logger.info(f"Loaded {self.progress.value()}/{self.progress.maximum()} files.")
         self.folder_status_label.setText(f"Loaded log file folder path: {self.loaded_folder}")
-        logging.info(f"Loaded log file folder path: {self.loaded_folder}")
+        logger.info(f"Loaded log file folder path: {self.loaded_folder}")
         self.all_rows = group_rows(all_rows)
         self.filtered_rows = self.all_rows.copy()
         self.apply_filters()
         self.update_table()
         if self.stop_requested:
             self.statusbar.showMessage("Loading stopped by user. Partial results shown.")
-            logging.info(f"Loading stopped by user. Partial results shown.")
+            logger.info(f"Loading stopped by user. Partial results shown.")
         else:
             self.statusbar.showMessage("All files loaded.")
-            logging.info(f"All files loaded.")
+            logger.info(f"All files loaded.")
 
     def reload_last_folder(self):
         folder = self.settings.value(LAST_FOLDER_KEY, "")
         if not folder or not os.path.isdir(folder):
             QMessageBox.warning(self, "Reload", "No valid last loaded folder found.")
-            logging.warning(f"Reload, No valid last loaded folder found.")
+            logger.warning(f"Reload, No valid last loaded folder found.")
             return
         self.load_log_folder(folder)
 
     # --- Filtering and Sorting ---
+    def match_advanced_filter(self, cell_value, filter_expr):
+        expr = filter_expr.strip()
+        if not expr:
+            return True
+        # Split by | for OR
+        or_parts = [part.strip() for part in expr.split('|')]
+        for or_part in or_parts:
+            if or_part.lower() in cell_value.lower():
+                return True
+        return False
+
     def apply_filters(self):
         filters = [edit.text().strip().lower() for edit in self.filter_edits]
         self.filtered_rows = []
@@ -1185,37 +1218,31 @@ class LogTriageWindow(QMainWindow):
                     continue
                 col_name = self.columns[i]
                 if col_name == "Count":
-                    if not parse_count_filter(f, row[self.columns.index("Count")]):
+                    if not parse_count_filter(f, row.count):
                         match = False
                         break
                 elif col_name == "Excluded":
-                    is_excluded = row[5] in self.exclusion_list
+                    is_excluded = row.message in self.exclusion_list
                     if (f in ["yes", "y", "1", "true"] and not is_excluded) or (f in ["no", "n", "0", "false"] and is_excluded):
                         match = False
                         break
-                    # If filter is not a recognized value, do substring match
                     if f not in ["yes", "y", "1", "true", "no", "n", "0", "false"]:
                         if (f not in ("yes" if is_excluded else "no")):
                             match = False
                             break
+                elif col_name == "Comments":
+                    # Usually skip filtering on comments, or implement if needed
+                    continue
                 else:
-                    # Map i to the correct index in row (since row doesn't have Excluded/Comments)
-                    excluded_idx = self.columns.index("Excluded")
-                    comments_idx = self.columns.index("Comments")
-                    if i < excluded_idx:
-                        row_index = i
-                    elif i < comments_idx:
-                        row_index = i - 1
-                    else:
-                        continue
-                    if f not in str(row[row_index]).lower():
+                    attr = self._colname_to_attr(col_name)
+                    if not self.match_advanced_filter(str(getattr(row, attr)), f):
                         match = False
                         break
             if not match:
                 continue
     
             # --- Exclusion filter logic (NEW) ---
-            is_excluded = row[5] in self.exclusion_list
+            is_excluded = row.message in self.exclusion_list
             if self.show_only_excluded and not is_excluded:
                 continue
             if self.show_only_nonexcluded and is_excluded:
@@ -1223,14 +1250,20 @@ class LogTriageWindow(QMainWindow):
             # -------------------------------------
     
             # Only filter scoreboard errors here
-            if not self.show_scoreboard and "sbd_compare" in str(row[5]).lower():
+            if not self.show_scoreboard and "sbd_compare" in str(row.message).lower():
                 continue
             self.filtered_rows.append(row)
         self.update_table()
-        unique_rows = {tuple(row) for row in self.filtered_rows}
+        unique_rows = {self.get_row_key(row) for row in self.filtered_rows}
         stats = self.get_message_stats()
         mem = get_memory_usage_mb()
         self.statusbar.showMessage(
+            f"Showing {len(self.filtered_rows)} rows | Memory: {mem:.1f} MB | "
+            f"ERROR: {stats['ERROR']['total']} ({stats['ERROR']['unique']} unique), "
+            f"FATAL: {stats['FATAL']['total']} ({stats['FATAL']['unique']} unique), "
+            f"WARNING: {stats['WARNING']['total']} ({stats['WARNING']['unique']} unique)"
+        )
+        logger.info(
             f"Showing {len(self.filtered_rows)} rows | Memory: {mem:.1f} MB | "
             f"ERROR: {stats['ERROR']['total']} ({stats['ERROR']['unique']} unique), "
             f"FATAL: {stats['FATAL']['total']} ({stats['FATAL']['unique']} unique), "
@@ -1240,56 +1273,55 @@ class LogTriageWindow(QMainWindow):
             QMessageBox.warning(self, "Memory Usage Warning",
                 f"High memory usage detected: {mem:.1f} MB.\n"
                 "Consider filtering or reducing the number of loaded files.")
-            logging.warning(f"Memory Usage Warning. High memory usage detected: {mem:.1f} MB. Consider filtering or reducing the number of loaded files.")
+            logger.warning(f"Memory Usage Warning. High memory usage detected: {mem:.1f} MB. Consider filtering or reducing the number of loaded files.")
+
+    def _colname_to_attr(self, col):
+        mapping = {
+            "ID": "id",
+            "Test Case": "testcase",
+            "Test Option": "testopt",
+            "Type": "type",
+            "Count": "count",
+            "Message": "message",
+            "Log Type": "logtype",
+            "Log File Path": "logfilepath",
+            "Line Number": "linenumber"
+        }
+        return mapping.get(col, col.lower().replace(" ", ""))
 
     def populate_table_rows(self):
         self.table.setRowCount(len(self.filtered_rows))
+        comments_col = self.columns.index("Comments")
         for i, row in enumerate(self.filtered_rows):
-            is_excluded = row[5] in self.exclusion_list  # Message column
+            is_excluded = row.message in self.exclusion_list
+            row_key = self.get_row_key(row)
             for j, col in enumerate(self.columns):
                 if col == "Excluded":
                     item = QTableWidgetItem("Yes" if is_excluded else "No")
-                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Read-only
+                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 elif col == "Comments":
-                    row_key = tuple(row)  # row does not include Excluded or Comments
                     comment = self.comments_dict.get(row_key, "")
                     item = QTableWidgetItem(comment)
                     item.setFlags(item.flags() | Qt.ItemIsEditable)
                 else:
-                    excluded_idx = self.columns.index("Excluded")
-                    comments_idx = self.columns.index("Comments")
-                    if j < excluded_idx:
-                        row_index = j
-                    elif j < comments_idx:
-                        row_index = j - 1
-                    else:
-                        continue  # Should not happen
-            
-                    # Only for the "Count" column, set integer data for sorting
-                    if col == "Count":
-                        item = QTableWidgetItem(str(row[row_index]))
-                        try:
-                            item.setData(Qt.EditRole, int(row[row_index]))
-                        except Exception:
-                            item.setData(Qt.EditRole, 0)  # fallback if conversion fails
-                    else:
-                        item = QTableWidgetItem(str(row[row_index]))
-            
+                    attr = self._colname_to_attr(col)
+                    value = getattr(row, attr)
+                    item = QTableWidgetItem(str(value))
+                    if j == 0:
+                        item.setData(Qt.UserRole, row_key)
                     # Color coding
-                    if row[3] == "ERROR":
+                    if row.type == "ERROR":
                         item.setForeground(Qt.red)
-                    elif row[3] == "FATAL":
+                    elif row.type == "FATAL":
                         item.setForeground(Qt.magenta)
-                    elif row[3] == "WARNING":
+                    elif row.type == "WARNING":
                         item.setForeground(Qt.darkYellow)
                     # Tooltips
-                    if row_index in [2, 5, 7]:  # Test Option, Message, Log File Path
-                        item.setToolTip(str(row[row_index]))
-                # Grey out excluded rows
+                    if attr in ["testopt", "message", "logfilepath"]:
+                        item.setToolTip(str(value))
                 if is_excluded:
                     item.setBackground(Qt.lightGray)
                 self.table.setItem(i, j, item)
-
         self.table.setColumnHidden(7, False)
         self.update_filter_row_geometry()
 
@@ -1320,13 +1352,33 @@ class LogTriageWindow(QMainWindow):
         valid_sort_order = [i for i in self.sort_order if i < len(self.columns)]
         if not valid_sort_order:
             return
+    
+        # Only sort by columns that are LogRow attributes
+        logrow_attrs = {"id", "testcase", "testopt", "type", "count", "message", "logtype", "logfilepath", "linenumber"}
         def sort_key(row):
-            return tuple(row[i] for i in valid_sort_order)
+            key = []
+            for i in valid_sort_order:
+                attr = self._colname_to_attr(self.columns[i])
+                if attr in logrow_attrs:
+                    key.append(getattr(row, attr))
+                elif self.columns[i] == "Excluded":
+                    key.append(row.message in self.exclusion_list)
+                elif self.columns[i] == "Comments":
+                    row_key = (
+                        row.id, row.testcase, row.testopt, row.type,
+                        row.message, row.logtype, row.logfilepath, row.linenumber
+                    )
+                    key.append(self.comments_dict.get(row_key, ""))
+                else:
+                    key.append("")  # fallback
+            return tuple(key)
+    
         self.filtered_rows.sort(key=sort_key)
         self.update_table(sort=False)
 
     # --- Export ---
     def export_to_csv(self):
+        self.update_comments_dict_from_table()  # <-- This must be the first line!
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle("Export to CSV")
         msg_box.setText("Export which data to CSV?")
@@ -1362,18 +1414,24 @@ class LogTriageWindow(QMainWindow):
                         row_data.append(cell.text() if cell else "")
                     rows[row] = row_data
             export_rows = list(rows.values())
+            pass
         else:
             for row in self.filtered_rows:
-                is_excluded = row[5] in self.exclusion_list
-                row_key = tuple(row)
+                is_excluded = row.message in self.exclusion_list
+                row_key = (
+                    row.id, row.testcase, row.testopt, row.type,
+                    row.message, row.logtype, row.logfilepath, row.linenumber
+                )
                 comment = self.comments_dict.get(row_key, "")
-                # Compose the row with Excluded and Comments
-                row_with_excl = list(row) + [("Yes" if is_excluded else "No"), comment]
+                row_with_excl = [
+                    row.id, row.testcase, row.testopt, row.type, row.count,
+                    row.message, row.logtype, row.logfilepath, row.linenumber,
+                    "Yes" if is_excluded else "No", comment
+                ]
                 export_rows.append(row_with_excl)
-    
         if not export_rows:
             QMessageBox.warning(self, "Export", "No data to export.")
-            logging.warning(f"Export, No data to export.")
+            logger.warning(f"Export, No data to export.")
             return
     
         path, _ = QFileDialog.getSaveFileName(self, "Export to CSV", os.getcwd(), "CSV Files (*.csv)")
@@ -1387,7 +1445,7 @@ class LogTriageWindow(QMainWindow):
                 for row in export_rows:
                     writer.writerow(row)
             self.statusbar.showMessage(f"Exported {len(export_rows)} {export_type} rows to {path}")
-            logging.warning(f"Exported {len(export_rows)} {export_type} rows to {path}")
+            logger.warning(f"Exported {len(export_rows)} {export_type} rows to {path}")
             excluded_count = sum(1 for row in export_rows if row[self.columns.index("Excluded")] == "Yes")
             QMessageBox.information(self, "Export Info",
                 f"Exported {len(export_rows)} {export_type} rows to {path}\n"
@@ -1395,11 +1453,13 @@ class LogTriageWindow(QMainWindow):
                 f"Excluded rows in export: {excluded_count}")
         except Exception as e:
             self.statusbar.showMessage(f"Failed to export: {e}")
-            logging.error(f"Failed to export: {e}")
+            logger.error(f"Failed to export: {e}")
             QMessageBox.critical(self, "Export Error", f"Failed to export:\n{e}")
 
     # --- Exclusion ---
     def add_to_exclusion(self):
+        self.commit_active_editor()  # <-- Add this line FIRST
+        self.update_comments_dict_from_table()
         selected = self.table.selectedItems()
         if not selected:
             QMessageBox.warning(self, "Exclusion", "No rows selected.")
@@ -1412,48 +1472,83 @@ class LogTriageWindow(QMainWindow):
         self.exclusion_list.update(rows)
         self.apply_filters()
         self.statusbar.showMessage(f"Added {len(rows)} messages to exclusion list.")
-        logging.warning(f"Added {len(rows)} messages to exclusion list.")
+        logger.info(f"Added {len(rows)} messages to exclusion list.")
 
     def view_exclusion(self):
         dlg = ExclusionListDialog(self.exclusion_list, self)
         dlg.exec_()
 
     def export_exclusion_list(self):
+        self.update_comments_dict_from_table()  # <-- This must be the first line!
         path, _ = QFileDialog.getSaveFileName(self, "Export Exclusion List", os.getcwd(), "CSV Files (*.csv)")
         if not path:
             return
         try:
             with open(path, "w", newline='', encoding="utf-8") as f:
                 writer = csv.writer(f)
+                writer.writerow(["Message", "Comment"])
                 for msg in sorted(self.exclusion_list):
-                    writer.writerow([msg])
+                    comment = ""
+                    for logrow in self.all_rows:
+                        if logrow.message == msg:
+                            row_key = (
+                                logrow.id, logrow.testcase, logrow.testopt, logrow.type,
+                                logrow.message, logrow.logtype, logrow.logfilepath, logrow.linenumber
+                            )
+                            comment = self.comments_dict.get(row_key, "")
+                            if comment:
+                                break
+                    writer.writerow([msg, comment])
             self.statusbar.showMessage(f"Exclusion list exported to {path}")
-            logging.info(f"Exclusion list exported to {path}.")
+            logger.info(f"Exclusion list exported to {path}.")
         except Exception as e:
             QMessageBox.critical(self, "Export Error", f"Failed to export exclusion list:\n{e}")
-            logging.error(f"Export Error, Failed to export exclusion list:{e}")
+            logger.error(f"Export Error, Failed to export exclusion list:{e}")
 
     def import_exclusion_list(self):
+        self.update_comments_dict_from_table()  # <-- This must be the first line!
         path, _ = QFileDialog.getOpenFileName(self, "Import Exclusion List", os.getcwd(), "CSV Files (*.csv)")
         if not path:
             return
         try:
             with open(path, "r", encoding="utf-8") as f:
-                reader = csv.reader(f)
-                self.exclusion_list = set(row[0] for row in reader if row)
+                reader = csv.DictReader(f)
+                for row in reader:
+                    msg = row["Message"]
+                    comment = row.get("Comment", "")
+                    self.exclusion_list.add(msg)
+                    # For all rows in current data with this message, set the comment
+                    for logrow in self.all_rows:
+                        # If logrow is a LogRow object
+                        if hasattr(logrow, 'message'):
+                            if logrow.message == msg:
+                                row_key = (
+                                    logrow.id, logrow.testcase, logrow.testopt, logrow.type,
+                                    logrow.message, logrow.logtype, logrow.logfilepath, logrow.linenumber
+                                )
+                                self.comments_dict[row_key] = comment
+                        # If logrow is a dict
+                        elif isinstance(logrow, dict):
+                            if logrow.get('message') == msg:
+                                row_key = (
+                                    logrow.get('id'), logrow.get('testcase'), logrow.get('testopt'), logrow.get('type'),
+                                    logrow.get('message'), logrow.get('logtype'), logrow.get('logfilepath'), logrow.get('linenumber')
+                                )
+                                self.comments_dict[row_key] = comment
             self.apply_filters()
             self.update_table()
             self.statusbar.showMessage(f"Exclusion list imported from {path} and applied to current data.")
-            logging.info(f"Exclusion list imported from {path} and applied to current data.")
+            logger.info(f"Exclusion list imported from {path} and applied to current data.")
         except Exception as e:
             QMessageBox.critical(self, "Import Error", f"Failed to import exclusion list:\n{e}")
-            logging.error(f"Import Error, Failed to import exclusion list:{e}")
+            logger.error(f"Import Error, Failed to import exclusion list:{e}")
 
     def clear_exclusion(self):
+        self.update_comments_dict_from_table()  # <-- This must be the first line!
         self.exclusion_list.clear()
         self.apply_filters()
         self.statusbar.showMessage("Exclusion list cleared.")
-        logging.info(f"Exclusion list cleared.")
+        logger.info(f"Exclusion list cleared.")
 
     # --- Summary ---
     def show_summary(self):
@@ -1464,14 +1559,14 @@ class LogTriageWindow(QMainWindow):
     
         # Only process rows with non-empty Test Case and Test Option
         for row in self.filtered_rows:
-            testcase = row[1]
-            testopt = row[2]
+            testcase = row.testcase
+            testopt = row.testopt
             if not testcase or not testopt:
                 continue
-            typ = row[3]
-            count = int(row[4])
-            msg = row[5]
-            log_type = row[6]  # "simulate" or "compile"
+            typ = row.type
+            count = int(row.count)
+            msg = row.message
+            log_type = row.logtype  # "simulate" or "compile"
             summary[(testcase, testopt)][typ] += count
             unique_msgs[(testcase, testopt)][typ].add(msg)
             if msg in self.exclusion_list:
@@ -1498,13 +1593,14 @@ class LogTriageWindow(QMainWindow):
 
     def show_row_stats(self):
         row_count = len(self.filtered_rows)
-        unique_rows = len({tuple(row) for row in self.filtered_rows})
+        unique_row_count = len({self.get_row_key(row) for row in self.filtered_rows})
         stats = self.get_message_stats()
-        msg = (f"Showing {row_count} rows | Unique rows: {unique_rows} | "
+        msg = (f"Showing {row_count} rows | Unique rows: {unique_row_count} | "
                f"ERROR: {stats['ERROR']['total']} ({stats['ERROR']['unique']} unique), "
                f"FATAL: {stats['FATAL']['total']} ({stats['FATAL']['unique']} unique), "
                f"WARNING: {stats['WARNING']['total']} ({stats['WARNING']['unique']} unique)")
         self.statusbar.showMessage(msg)
+        logger.info(f"{msg}.")
 
     # --- Context Menu ---
     def show_context_menu(self, pos):
@@ -1526,7 +1622,8 @@ class LogTriageWindow(QMainWindow):
         if not selected:
             return
         row = selected[0].row()
-        row_key = tuple(self.table.item(row, col).text() for col in range(len(self.columns) - 1))
+        logrow = self.get_logrow_for_table_row(row)
+        row_key = self.get_row_key(logrow)
         comment = self.comments_dict.get(row_key, "")
         msg = comment if comment.strip() else "(No comments)"
         QMessageBox.information(self, "All Comments", msg)
@@ -1536,6 +1633,7 @@ class LogTriageWindow(QMainWindow):
             "File Menu:\n"
             "  Ctrl+O: Load Log Folder\n"
             "  Ctrl+R: Reload\n"
+            "  Ctrl+P: Load Patterns File\n"
             "  Ctrl+E: Export to CSV\n"
             "  Ctrl+Q: Exit\n"
             "\n"
@@ -1598,8 +1696,10 @@ class LogTriageWindow(QMainWindow):
         text = "\n".join(["\t".join(row) for row in rows.values()])
         QApplication.clipboard().setText(text)
         self.statusbar.showMessage("Copied selected row(s) to clipboard.")
+        logger.info(f"Copied selected row(s) to clipboard.")
 
-    def toggle_column(self, col_index, checked):
+    def toggle_column(self, col_index):
+        checked = self.column_actions[col_index].isChecked()
         self.table.setColumnHidden(col_index, not checked)
         self.update_filter_row_geometry()
 
@@ -1615,18 +1715,17 @@ class LogTriageWindow(QMainWindow):
             os.system(f"gvim '+{lineno}' '{filepath}' &")
         else:
             QMessageBox.warning(self, "Open Log File", f"File not found:\n{filepath}")
-            logging.warning(f"Open Log File", f"File not found:\n{filepath}.")
+            logger.warning(f"Open Log File", f"File not found:\n{filepath}.")
 
     def handle_table_double_click(self, index):
         if index.column() == len(self.columns) - 1:  # Comments column
-            # Open dialog for multi-line editing
             current_text = self.table.item(index.row(), index.column()).text()
             dlg = CommentEditDialog(current_text, self)
             if dlg.exec_() == QDialog.Accepted:
                 new_text = dlg.get_text()
                 self.table.item(index.row(), index.column()).setText(new_text)
-                # Update comments_dict
-                row_key = tuple(self.table.item(index.row(), col).text() for col in range(len(self.columns) - 1))
+                logrow = self.get_logrow_for_table_row(index.row())
+                row_key = self.get_row_key(logrow)
                 self.comments_dict[row_key] = new_text
         else:
             self.open_log_file(index)
@@ -1634,17 +1733,18 @@ class LogTriageWindow(QMainWindow):
     # --- Log menu actions ---
     def toggle_simulate(self):
         self.show_simulate = self.simulate_action.isChecked()
-        self.load_log_folder(self.loaded_folder)
-
+        self.apply_filters()
+    
     def toggle_compile(self):
         self.show_compile = self.compile_action.isChecked()
-        self.load_log_folder(self.loaded_folder)
+        self.apply_filters()
 
     def toggle_scoreboard(self):
         self.show_scoreboard = self.scoreboard_action.isChecked()
         self.apply_filters()
 
     def save_session(self):
+        self.update_comments_dict_from_table()  # <-- This must be the first line!
         default_dir = os.getcwd()
         comments_col = self.columns.index("Comments")
         for row in range(self.table.rowCount()):
@@ -1667,7 +1767,10 @@ class LogTriageWindow(QMainWindow):
                 data_columns = [col for col in self.columns if col not in ("Excluded", "Comments")]
                 writer.writerow(data_columns)
                 for row in self.filtered_rows:
-                    writer.writerow(row)
+                    writer.writerow([
+                        row.id, row.testcase, row.testopt, row.type, row.count,
+                        row.message, row.logtype, row.logfilepath, row.linenumber
+                    ])
                 f.write("[COMMENTS]\n")
                 for key, comment in self.comments_dict.items():
                     writer.writerow(list(key) + [comment])
@@ -1675,21 +1778,28 @@ class LogTriageWindow(QMainWindow):
                 for msg in self.exclusion_list:
                     writer.writerow([msg])
             self.statusbar.showMessage(f"Session saved to {path}")
+            logger.info(f"Session saved to {path}.")
         except Exception as e:
             QMessageBox.critical(self, "Save Session Error", f"Failed to save session:\n{e}")
-            logging.error(f"Save Session Error, Failed to save session:{e}")
+            logger.error(f"Save Session Error, Failed to save session:{e}")
 
     def update_comments_dict_from_table(self):
         comments_col = self.columns.index("Comments")
         for row in range(self.table.rowCount()):
-            row_data = []
-            for col in range(len(self.columns) - 1):
-                cell = self.table.item(row, col)
-                row_data.append(cell.text() if cell else "")
-            row_key = tuple(row_data)
+            row_key = self.table.item(row, 0).data(Qt.UserRole)
             comment_item = self.table.item(row, comments_col)
             comment = comment_item.text() if comment_item else ""
             self.comments_dict[row_key] = comment
+
+    def get_logrow_for_table_row(self, row_idx):
+        # self.filtered_rows is in the same order as the table
+        return self.filtered_rows[row_idx]
+
+    def get_row_key(self, row):
+        return (
+            row.id, row.testcase, row.testopt, row.type,
+            row.message, row.logtype, row.logfilepath, row.linenumber
+        )
 
     def load_session(self):
         default_dir = os.getcwd()
@@ -1714,20 +1824,22 @@ class LogTriageWindow(QMainWindow):
                     if row and row[0].startswith("["):
                         section_header = row[0]
                         break
-                    rows.append(row)
+                    if len(row) >= 9:
+                        rows.append(LogRow(*row[:9]))
                 else:
                     section_header = None
-    
+
                 comments_dict = {}
                 if section_header == "[COMMENTS]":
                     for row in csv.reader(f):
                         if row and row[0].startswith("["):
                             section_header = row[0]
                             break
-                        if len(row) < len(self.columns) - 2:  # Excluded and Comments not in data
+                        if not row or len(row) < len(self.columns) - 2 + 1:
+                            logger.error(f"Skipping malformed comment row: {row}")
                             continue
-                        row_key = tuple(row[:len(self.columns)-2])
-                        comment = row[len(self.columns)-2]
+                        row_key = tuple(row[:ROW_KEY_LEN])
+                        comment = row[ROW_KEY_LEN]
                         comments_dict[row_key] = comment
                 else:
                     comments_dict = {}
@@ -1737,6 +1849,7 @@ class LogTriageWindow(QMainWindow):
                     for row in csv.reader(f):
                         if row and not row[0].startswith("["):
                             exclusion_list.add(row[0])
+
     
             self.all_rows = rows
             self.comments_dict = comments_dict
@@ -1747,8 +1860,14 @@ class LogTriageWindow(QMainWindow):
             stats = self.get_message_stats()
             mem = get_memory_usage_mb()
             self.folder_status_label.setText(f"Loaded session file: {os.path.basename(path)}")
-            logging.info(f"Loaded session file: {os.path.basename(path)}")
+            logger.info(f"Loaded session file: {os.path.basename(path)}")
             self.statusbar.showMessage(
+                f"Session loaded from {path} | Showing {len(self.filtered_rows)} rows | Memory: {mem:.1f} MB | "
+                f"ERROR: {stats['ERROR']['total']} ({stats['ERROR']['unique']} unique), "
+                f"FATAL: {stats['FATAL']['total']} ({stats['FATAL']['unique']} unique), "
+                f"WARNING: {stats['WARNING']['total']} ({stats['WARNING']['unique']} unique)"
+            )
+            logger.info(
                 f"Session loaded from {path} | Showing {len(self.filtered_rows)} rows | Memory: {mem:.1f} MB | "
                 f"ERROR: {stats['ERROR']['total']} ({stats['ERROR']['unique']} unique), "
                 f"FATAL: {stats['FATAL']['total']} ({stats['FATAL']['unique']} unique), "
@@ -1758,12 +1877,12 @@ class LogTriageWindow(QMainWindow):
             self.progress.setMaximum(1)
             self.progress.setValue(1)
             self.progress.setFormat("Session loaded.")
-            logging.info(f"Session loaded.")
+            logger.info(f"Session loaded.")
             QApplication.processEvents()
         except Exception as e:
             self.progress.setFormat("Failed to load session.")
             QMessageBox.critical(self, "Load Session Error", f"Failed to load session:\n{e}")
-            logging.error(f"Load Session Error, Failed to load session:{e}.")
+            logger.error(f"Load Session Error, Failed to load session:{e}.")
 
     def toggle_dark_mode(self):
         if self.dark_mode_action.isChecked():
@@ -1853,28 +1972,53 @@ class LogParseWorker(QThread):
         for idx, filepath in enumerate(self.log_files):
             if self._stop_requested:
                 break
+            logger.info(f"Processing file {idx+1}/{len(self.log_files)}: {filepath}")
             id_val, testcase, testopt = extract_log_info(filepath)
             error_counts, fatal_counts, warning_counts = parse_log_file(filepath, self.patterns)
             for (msg, lineno), count in error_counts.items():
                 if not self.show_scoreboard and "sbd_compare" in msg.lower():
                     continue
-                row = [
-                    id_val, testcase, testopt, "ERROR", count, msg, "simulate" if "simulate" in os.path.basename(filepath) else "compile", filepath, lineno
-                ]
+                row = LogRow(
+                    id=id_val,
+                    testcase=testcase,
+                    testopt=testopt,
+                    type="ERROR",
+                    count=count,
+                    message=msg,
+                    logtype="simulate" if "simulate" in os.path.basename(filepath) else "compile",
+                    logfilepath=filepath,
+                    linenumber=lineno
+                )
                 all_rows.append(row)
             for (msg, lineno), count in fatal_counts.items():
                 if not self.show_scoreboard and "sbd_compare" in msg.lower():
                     continue
-                row = [
-                    id_val, testcase, testopt, "FATAL", count, msg, "simulate" if "simulate" in os.path.basename(filepath) else "compile", filepath, lineno
-                ]
+                row = LogRow(
+                    id=id_val,
+                    testcase=testcase,
+                    testopt=testopt,
+                    type="FATAL",
+                    count=count,
+                    message=msg,
+                    logtype="simulate" if "simulate" in os.path.basename(filepath) else "compile",
+                    logfilepath=filepath,
+                    linenumber=lineno
+                )
                 all_rows.append(row)
             for (msg, lineno), count in warning_counts.items():
                 if not self.show_scoreboard and "sbd_compare" in msg.lower():
                     continue
-                row = [
-                    id_val, testcase, testopt, "WARNING", count, msg, "simulate" if "simulate" in os.path.basename(filepath) else "compile", filepath, lineno
-                ]
+                row = LogRow(
+                    id=id_val,
+                    testcase=testcase,
+                    testopt=testopt,
+                    type="WARNING",
+                    count=count,
+                    message=msg,
+                    logtype="simulate" if "simulate" in os.path.basename(filepath) else "compile",
+                    logfilepath=filepath,
+                    linenumber=lineno
+                )
                 all_rows.append(row)
             self.progress.emit(idx+1, len(self.log_files))
         self.finished.emit(all_rows)
@@ -1883,9 +2027,10 @@ class LogParseWorker(QThread):
         self._stop_requested = True
 
 if __name__ == "__main__":
-    import logging
-    import sys
-    import traceback
+
+    logfile = 'tool_process.log'  # or 'tool_process.txt'
+    if os.path.exists(logfile):
+        os.remove(logfile)
 
     # --- Custom FileHandler that flushes after every log message ---
     class FlushFileHandler(logging.FileHandler):
@@ -1898,7 +2043,7 @@ if __name__ == "__main__":
     logger.setLevel(logging.DEBUG)
 
     # File handler (immediate flush)
-    file_handler = FlushFileHandler('tool_process.log', mode='a', encoding='utf-8', delay=False)
+    file_handler = FlushFileHandler(logfile, mode='w', encoding='utf-8', delay=False)
     file_handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
     file_handler.setFormatter(formatter)
@@ -1912,18 +2057,13 @@ if __name__ == "__main__":
 
     # --- Example log messages (remove or keep as needed) ---
     logging.info("Tool started")
-    logging.debug("Debugging info")
-    logging.warning("A warning")
-    logging.error("An error")
 
-    # --- Uncaught exception handler ---
     def log_uncaught_exceptions(exctype, value, tb):
         error_msg = "".join(traceback.format_exception(exctype, value, tb))
-        logging.error("Uncaught exception:\n%s", error_msg)
+        logger.error("Uncaught exception:\n%s", error_msg)
         from PyQt5.QtWidgets import QMessageBox
         QMessageBox.critical(None, "Unexpected Error",
-            "An unexpected error occurred:\n\n" + str(value) +
-            "\n\nSee tool_process.log for details.")
+            f"An unexpected error occurred:\n\n{value}\n\nSee {logfile} for details.")
 
     sys.excepthook = log_uncaught_exceptions
 
