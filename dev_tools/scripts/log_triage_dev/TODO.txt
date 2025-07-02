@@ -26,18 +26,8 @@
 - Filter Row Placement:  
   The filter row is implemented as a floating widget. This is clever, but can be fragile with resizing/scrolling. If you see glitches, consider using a fixed filter row above the table.
 
-- Column Indexing:  
-  There’s a lot of manual index calculation for columns (especially with Excluded/Comments). This is error-prone. Consider using namedtuples or dataclasses for rows, or always referencing columns by name.
-
 - Resizable Columns:
   Consider saving/restoring column order as well as width.
-
-- Advanced Filtering:
-  Add support for AND/OR logic in filters, or a global search box.
-
-- Visualization:
-  Allow exporting all charts at once.
-  Add more chart types (e.g., time series if logs have timestamps).
 
 - Accessibility:
   Ensure color choices are accessible (e.g., for colorblind users).
@@ -61,36 +51,13 @@
 - Thread Safety:  
   The worker thread emits signals to update the UI, which is correct. Ensure that all UI updates are done in the main thread.
 
-- In parse_log_file, the error/fatal/warning counts are incremented twice (once by Counter, once in the loop). This may be a bug—review this logic.
-
 ## 5. Code Quality
-
-- Magic Numbers/Strings:  
-  There are several hardcoded indices and strings (e.g., column indices, color codes). Define these as constants at the top for maintainability.
 
 - Repeated Code:  
   There’s some repeated logic (e.g., for exporting/importing CSVs, updating recent folders). Refactor into reusable functions.
   Some code (e.g., color setting, tooltips) is repeated in multiple places. Consider helper functions.
 
-- Unused Imports:  
-  Some imports (e.g., `QWidgetAction`, `QToolBar`) are not used. Remove unused imports.
-
-- Logging:  
-  Use logger instead of the root logging module for all log calls (e.g., logger.info(...)).
-  Consider rotating log files if they get large.
-
-## 6. Functionality
-
-- Regex Filtering:  
-  Only the Find dialog supports regex. Consider adding regex support to column filters.
-
-- Session Save/Load:  
-  When loading a session, you overwrite `all_rows` and `filtered_rows` directly. Ensure this doesn’t break the grouping logic.
-
-- Memory Usage:  
-  For very large log sets, consider lazy loading or paging.
-
-## 7. User Experience
+## 6. User Experience
 
 - Filter Row Usability:
   Consider adding a "Clear All Filters" button.
@@ -102,10 +69,7 @@
 - Error Feedback:
   When loading fails (e.g., bad patterns file), consider showing the error in a dedicated error dialog with details and possible fixes.
 
-- Dark Mode Persistence:
-  Save the dark mode setting in QSettings so it persists across sessions.
-
-## 8. Documentation
+## 7. Documentation
 
 - User Guide:
   Consider generating a user guide (even as a markdown file) from your features dialog content.
@@ -136,5 +100,16 @@
     - Plugin System: Allow users to add custom log parsers or visualizations.
     - Remote Log Loading: Support loading logs from remote servers.
     - Automated Report Generation: Generate PDF/HTML reports from filtered data.
+
+--------------------------------------------------------------------------------------------------------------
+
+- Issue in Large file loading
+  /home/data/mpu32_simulation/MUSTANG_ST012_A0/simulation_logs/MUSTANG_ST012_A0_HPP_ISS_RTL7_ECO0/RTL_rtl7_eco0_Regression_06_27_2025
+
+--------------------------------------------------------------------------------------------------------------
+
+- Session Save/Load:  
+  When loading a session, you overwrite `all_rows` and `filtered_rows` directly. Ensure this doesn’t break the grouping logic.
+Need to check the comment and exclusion vice versa options
 
 --------------------------------------------------------------------------------------------------------------
