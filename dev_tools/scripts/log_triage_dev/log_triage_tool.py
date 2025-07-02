@@ -1759,7 +1759,7 @@ class LogTriageWindow(QMainWindow):
         if not path:
             return
         try:
-            with open(path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8", newline='') as f:
                 f.write("# LogTriage Session File v1\n")
                 f.write("[ROWS]\n")
                 writer = csv.writer(f)
@@ -1768,12 +1768,18 @@ class LogTriageWindow(QMainWindow):
                 writer.writerow(data_columns)
                 for row in self.filtered_rows:
                     writer.writerow([
-                        row.id, row.testcase, row.testopt, row.type, row.count,
-                        row.message, row.logtype, row.logfilepath, row.linenumber
+                        str(row.id), str(row.testcase), str(row.testopt), str(row.type), str(row.count),
+                        str(row.message), str(row.logtype), str(row.logfilepath), str(row.linenumber)
                     ])
                 f.write("[COMMENTS]\n")
-                for key, comment in self.comments_dict.items():
-                    writer.writerow(list(key) + [comment])
+                # Always write a header for comments
+                comment_header = ["id", "testcase", "testopt", "type", "message", "logtype", "logfilepath", "linenumber", "comment"]
+                writer.writerow(comment_header)
+                if self.comments_dict:
+                    for key, comment in self.comments_dict.items():
+                        # Ensure all key fields are strings
+                        key_str = [str(x) for x in key]
+                        writer.writerow(key_str + [comment])
                 f.write("[EXCLUSIONS]\n")
                 for msg in self.exclusion_list:
                     writer.writerow([msg])
@@ -1815,6 +1821,7 @@ class LogTriageWindow(QMainWindow):
             QApplication.processEvents()
     
             with open(path, "r", encoding="utf-8") as f:
+                # Find [ROWS] section
                 for line in f:
                     if line.strip() == "[ROWS]":
                         break
@@ -1825,33 +1832,41 @@ class LogTriageWindow(QMainWindow):
                         section_header = row[0]
                         break
                     if len(row) >= 9:
-                        rows.append(LogRow(*row[:9]))
+                        # Ensure all fields are strings
+                        rows.append(LogRow(*[str(x) for x in row[:9]]))
                 else:
                     section_header = None
-
+    
+                # --- COMMENTS section ---
                 comments_dict = {}
                 if section_header == "[COMMENTS]":
-                    for row in csv.reader(f):
+                    comment_reader = csv.reader(f)
+                    # Skip the header row
+                    try:
+                        next(comment_reader)
+                    except StopIteration:
+                        pass  # No comments to read
+                    for row in comment_reader:
                         if row and row[0].startswith("["):
                             section_header = row[0]
                             break
-                        if not row or len(row) < len(self.columns) - 2 + 1:
+                        if not row or len(row) < ROW_KEY_LEN + 1:
                             logger.error(f"Skipping malformed comment row: {row}")
                             continue
-                        row_key = tuple(row[:ROW_KEY_LEN])
+                        row_key = tuple(str(x) for x in row[:ROW_KEY_LEN])
                         comment = row[ROW_KEY_LEN]
                         comments_dict[row_key] = comment
                 else:
                     comments_dict = {}
     
+                # --- EXCLUSIONS section ---
                 exclusion_list = set()
                 if section_header == "[EXCLUSIONS]":
                     for row in csv.reader(f):
                         if row and not row[0].startswith("["):
                             exclusion_list.add(row[0])
-
     
-            self.all_rows = rows
+            self.all_rows = group_rows(rows)
             self.comments_dict = comments_dict
             self.exclusion_list = exclusion_list
             self.filtered_rows = self.all_rows.copy()
