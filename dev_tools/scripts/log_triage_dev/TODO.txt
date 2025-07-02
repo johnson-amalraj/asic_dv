@@ -107,9 +107,3 @@
   /home/data/mpu32_simulation/MUSTANG_ST012_A0/simulation_logs/MUSTANG_ST012_A0_HPP_ISS_RTL7_ECO0/RTL_rtl7_eco0_Regression_06_27_2025
 
 --------------------------------------------------------------------------------------------------------------
-
-- Session Save/Load:  
-  When loading a session, you overwrite `all_rows` and `filtered_rows` directly. Ensure this doesn’t break the grouping logic.
-Need to check the comment and exclusion vice versa options
-
---------------------------------------------------------------------------------------------------------------
