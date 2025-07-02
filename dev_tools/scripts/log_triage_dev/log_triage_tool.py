@@ -629,6 +629,18 @@ class CommentEditDialog(QDialog):
     def get_text(self):
         return self.text_edit.toPlainText()
 
+class NumericTableWidgetItem(QTableWidgetItem):
+    def __init__(self, value):
+        super().__init__(str(value))
+        try:
+            self.value = int(value)
+        except Exception:
+            self.value = 0
+    def __lt__(self, other):
+        if isinstance(other, NumericTableWidgetItem):
+            return self.value < other.value
+        return super().__lt__(other)
+
 class LogTriageWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -1306,7 +1318,11 @@ class LogTriageWindow(QMainWindow):
                 else:
                     attr = self._colname_to_attr(col)
                     value = getattr(row, attr)
-                    item = QTableWidgetItem(str(value))
+                    # --- Use NumericTableWidgetItem for Count column ---
+                    if col == "Count":
+                        item = NumericTableWidgetItem(value)
+                    else:
+                        item = QTableWidgetItem(str(value))
                     if j == 0:
                         item.setData(Qt.UserRole, row_key)
                     # Color coding
@@ -1321,6 +1337,7 @@ class LogTriageWindow(QMainWindow):
                         item.setToolTip(str(value))
                 if is_excluded:
                     item.setBackground(Qt.lightGray)
+                self.table.setItem(i, j, item)
                 self.table.setItem(i, j, item)
         self.table.setColumnHidden(7, False)
         self.update_filter_row_geometry()
