@@ -91,19 +91,25 @@
 # Future Ideas
 --------------------------------------------------------------------------------------------------------------
 
-    - Tagging System: Allow users to tag log entries for categorization.
-    - Bulk Commenting: When adding comments, apply them to all rows with the same message.
-    - Code Refactoring: Once all features are added, split the code into different files for re-use.
-    - Command Line Interface (CLI): For users who prefer scripting or automation.
-    - Auto-Triage Suggestions: Use simple heuristics or ML to suggest likely causes or group similar issues.
-    - Integration Hooks: Allow integration with bug tracking tools (e.g., JIRA) or CI/CD pipelines.
-    - Plugin System: Allow users to add custom log parsers or visualizations.
-    - Remote Log Loading: Support loading logs from remote servers.
-    - Automated Report Generation: Generate PDF/HTML reports from filtered data.
+- Tagging System: Allow users to tag log entries for categorization.
+- Bulk Commenting: When adding comments, apply them to all rows with the same message.
+- Code Refactoring: Once all features are added, split the code into different files for re-use.
+- Command Line Interface (CLI): For users who prefer scripting or automation.
+- Auto-Triage Suggestions: Use simple heuristics or ML to suggest likely causes or group similar issues.
+- Integration Hooks: Allow integration with bug tracking tools (e.g., JIRA) or CI/CD pipelines.
+- Plugin System: Allow users to add custom log parsers or visualizations.
+- Remote Log Loading: Support loading logs from remote servers.
+- Automated Report Generation: Generate PDF/HTML reports from filtered data.
+- Compare: Comparision between differnet regressions
 
 --------------------------------------------------------------------------------------------------------------
 
 - Issue in Large file loading
   /home/data/mpu32_simulation/MUSTANG_ST012_A0/simulation_logs/MUSTANG_ST012_A0_HPP_ISS_RTL7_ECO0/RTL_rtl7_eco0_Regression_06_27_2025
+
+- First Error Need some focus
+- License issue (Need to take care)
+- Downgraded error needs to be removed from the table (by default some .csv will handle it)
+- I saved the session, and i have loaded the session. Then i opened the another regressuib folder, but exclusion from previosu was loaded, so whenever i am loading new session, it needs to ignore the exclusion
 
 --------------------------------------------------------------------------------------------------------------
