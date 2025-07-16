@@ -150,17 +150,3 @@ Example Log Path
     pattern/ignore_patterns.json is a list of regex strings or objects with a "Regex" key.
 
 -------------------------------------------------------------------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------------------------------------
-# Known Issues
---------------------------------------------------------------------------------------------------------------
-
-- Issue in Large file loading
-  /home/data/mpu32_simulation/simulation_logs/MUSTANG_ST012_A0_HPP_PSS_rtl5p2_eco0/RTL_2025_06_12/max/puf-UPF_ALLON_PUFON_2-CPU600_MSS200_DDR800_ISS266-ID2800345-20250612T152452Z/simulate.log
-
-- Patterns
-  - License issue (Need to take care)
-  - GLS regression error needs to take care
-  - Downgraded error needs to be removed from the table (by default some .csv will handle it)
-
---------------------------------------------------------------------------------------------------------------
