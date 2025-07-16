@@ -9,6 +9,7 @@ import psutil
 import matplotlib
 import matplotlib.style
 import numpy as np
+import datetime
 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QFileDialog, QTableWidget, QTableWidgetItem, QVBoxLayout, 
@@ -837,6 +838,11 @@ class LogTriageWindow(QMainWindow):
     }
     """
 
+    @staticmethod
+    def is_night_time():
+        now = datetime.datetime.now().time()
+        return now >= datetime.time(19, 0) or now < datetime.time(7, 0)
+
     def __init__(self):
         super().__init__()
         self.patterns_file = os.path.join(os.path.dirname(__file__), "pattern/regex_patterns.json")
@@ -849,7 +855,7 @@ class LogTriageWindow(QMainWindow):
         self.stop_requested = False
         self.exclusion_row_keys = set()
         self.comments_dict = {}  # {row_key: comment}
-        self.setWindowTitle("Log Triage v4.0.0")
+        self.setWindowTitle("Log Triage v4.1.0")
         self.columns = ["ID", "Test Case", "Test Option", "Type", "Count", "Message", "Log Type", "Log File Path", "Line Number", "Excluded", "Comments"]
         self.settings = QSettings("LogTriage", "LogTriageApp")
         self.all_rows = []
@@ -861,7 +867,15 @@ class LogTriageWindow(QMainWindow):
         self.show_scoreboard = True
         self.logfile_column_visible = True 
         self.init_ui()
+        # Automatically enable dark mode based on time
+        if self.is_night_time():
+            self.dark_mode_action.setChecked(True)
+            self.setStyleSheet(self.dark_stylesheet)
+        else:
+            self.dark_mode_action.setChecked(False)
+            self.setStyleSheet(self.light_stylesheet)
         self.restore_settings()
+        self.setStyleSheet(self.light_stylesheet)
         self.exclusion_list = set()
         self.show_only_excluded = False
         self.show_only_nonexcluded = False
@@ -1355,10 +1369,12 @@ class LogTriageWindow(QMainWindow):
         exclusion_menu.addAction(clear_excl_action)
     
         clear_row_excl_action = QAction("Clear Per-Row Exclusions", self)
+        clear_row_excl_action.setShortcut("Ctrl+Alt+R")
         clear_row_excl_action.triggered.connect(self.clear_per_row_exclusions)
         exclusion_menu.addAction(clear_row_excl_action)
         
         clear_msg_excl_action = QAction("Clear Per-Message Exclusions", self)
+        clear_msg_excl_action.setShortcut("Ctrl+Alt+M")
         clear_msg_excl_action.triggered.connect(self.clear_per_message_exclusions)
         exclusion_menu.addAction(clear_msg_excl_action)
 
@@ -1378,33 +1394,39 @@ class LogTriageWindow(QMainWindow):
     
         # --- Comments clear actions ---
         comment_menu = self.menu.addMenu("&Comment")
-
+        
         show_all_comments_action = QAction("Show All Comments", self)
+        show_all_comments_action.setShortcut("Ctrl+Shift+M")
         show_all_comments_action.triggered.connect(self.show_all_comments)
         comment_menu.addAction(show_all_comments_action)
         
         comment_menu.addSeparator()
-
+        
         clear_all_comments_action = QAction("Clear All Comments", self)
+        clear_all_comments_action.setShortcut("Ctrl+Shift+Del")
         clear_all_comments_action.triggered.connect(self.clear_all_comments)
         comment_menu.addAction(clear_all_comments_action)
         
         clear_comment_row_action = QAction("Clear Comment [ROW]", self)
+        clear_comment_row_action.setShortcut("Ctrl+Shift+R")
         clear_comment_row_action.triggered.connect(lambda: self.clear_comment_selected(per_row=True))
         comment_menu.addAction(clear_comment_row_action)
         
         clear_comment_all_action = QAction("Clear Comment [ALL ROW with this message]", self)
+        clear_comment_all_action.setShortcut("Ctrl+Shift+G")
         clear_comment_all_action.triggered.connect(lambda: self.clear_comment_selected(per_row=False))
         comment_menu.addAction(clear_comment_all_action)
-
+        
         comment_menu.addSeparator()
         
         self.show_only_commented_action = QAction("Show Only Commented Rows", self, checkable=True)
+        self.show_only_commented_action.setShortcut("Ctrl+Alt+M")
         self.show_only_commented_action.setChecked(False)
         self.show_only_commented_action.triggered.connect(self.toggle_show_only_commented)
         comment_menu.addAction(self.show_only_commented_action)
         
         self.show_only_noncommented_action = QAction("Show Only Non-Commented Rows", self, checkable=True)
+        self.show_only_noncommented_action.setShortcut("Ctrl+Alt+N")
         self.show_only_noncommented_action.setChecked(False)
         self.show_only_noncommented_action.triggered.connect(self.toggle_show_only_noncommented)
         comment_menu.addAction(self.show_only_noncommented_action)
@@ -2140,20 +2162,24 @@ class LogTriageWindow(QMainWindow):
     # --- Context Menu ---
     def show_context_menu(self, pos):
         menu = QMenu(self)
-
+    
         copy_cell_action = QAction("Copy Cell", self)
+        copy_cell_action.setShortcut("Ctrl+Shift+C")
         copy_cell_action.triggered.connect(self.copy_current_cell)
         menu.addAction(copy_cell_action)
-
+    
         excl_row_action = QAction("Exclude [This ROW only]", self)
+        excl_row_action.setShortcut("Ctrl+X")
         excl_row_action.triggered.connect(lambda: self.add_to_exclusion(per_row=True))
         menu.addAction(excl_row_action)
-
+    
         excl_all_action = QAction("Exclude [ALL ROW with this message]", self)
+        excl_all_action.setShortcut("Ctrl+U")
         excl_all_action.triggered.connect(lambda: self.add_to_exclusion(per_row=False))
         menu.addAction(excl_all_action)
-
+    
         show_all_comments_action = QAction("Show All Comments", self)
+        show_all_comments_action.setShortcut("Ctrl+Shift+M")
         show_all_comments_action.triggered.connect(self.show_all_comments)
         menu.addAction(show_all_comments_action)
         menu.exec_(self.table.viewport().mapToGlobal(pos))
@@ -2200,55 +2226,101 @@ class LogTriageWindow(QMainWindow):
 
     def show_shortcuts(self):
         html = (
-            "<pre>"
-            "File Menu:\n"
-            "  Ctrl+O: Load Log Folder\n"
-            "  Ctrl+R: Reload\n"
-            "  Ctrl+P: Load Patterns File\n"
-            "  Ctrl+E: Export to JSON\n"
-            "  Ctrl+Q: Exit\n"
-            "\n"
-            "Edit Menu:\n"
-            "  Ctrl+C: Copy Selected Row(s)\n"
-            "  Ctrl+F: Find\n"
-            "\n"
-            "Exclusion Menu:\n"
-            "  Ctrl+X: Exclude [This ROW only]\n"
-            "  Ctrl+U: Exclude [ALL ROW with this message]\n"
-            "  Ctrl+Shift+V: View Exclusion List\n"
-            "  Ctrl+Shift+E: Export Exclusion List\n"
-            "  Ctrl+Shift+I: Import Exclusion List\n"
-            "  Ctrl+Shift+C: Clear Exclusion List\n"
-            "  Ctrl+Shift+X: Show Only Excluded Rows\n"
-            "  Ctrl+Shift+N: Show Only Non-Excluded Rows\n"
-            "\n"
-            "Log Menu:\n"
-            "  Ctrl+1: Show simulate.log\n"
-            "  Ctrl+2: Show compile.log\n"
-            "  Ctrl+3: Show Scoreboard Errors\n"
-            "\n"
-            "Summary Menu:\n"
-            "  Ctrl+S: Show Summary\n"
-
-            "  Ctrl+Shift+R: Show Row Stats\n"
-            "\n"
-            "Session Menu:\n"
-            "  Ctrl+Shift+S: Save Session\n"
-            "  Ctrl+Shift+O: Load Session\n"
-            "\n"
-            "Settings Menu:\n"
-            "  Ctrl+D: Dark Mode\n"
-            "\n"
-            "Help Menu:\n"
-            "  F1: Shortcut Keys\n"
-            "  F2: Features\n"
-            "  F3: Author\n"
-            "</pre>"
-        )
-        dlg = HelpDialog("Shortcuts", html, self)
-        dlg.setStyleSheet(self.get_current_stylesheet())  # <-- Add this line
-        dlg.exec_()
+            "<h2>LogTriage Application – Keyboard Shortcuts</h2>"
+            "<ul>"
+            "<li><b>File Menu</b>"
+            "<ul>"
+            "<li><code>Ctrl+O</code>: Load Log Folder</li>"
+            "<li><code>Ctrl+R</code>: Reload</li>"
+            "<li><code>Ctrl+P</code>: Load Patterns File</li>"
+            "<li><code>Ctrl+E</code>: Export to JSON</li>"
+            "<li><code>Ctrl+Q</code>: Exit</li>"
+            "</ul></li>"
     
+            "<li><b>Edit Menu</b>"
+            "<ul>"
+            "<li><code>Ctrl+C</code>: Copy Selected Row(s)</li>"
+            "<li><code>Ctrl+F</code>: Find</li>"
+            "</ul></li>"
+    
+            "<li><b>Exclusion Menu</b>"
+            "<ul>"
+            "<li><code>Ctrl+X</code>: Exclude [This ROW only]</li>"
+            "<li><code>Ctrl+U</code>: Exclude [ALL ROW with this message]</li>"
+            "<li><code>Ctrl+Shift+V</code>: View Exclusion List</li>"
+            "<li><code>Ctrl+Shift+E</code>: Export Exclusion List</li>"
+            "<li><code>Ctrl+Shift+I</code>: Import Exclusion List</li>"
+            "<li><code>Ctrl+Shift+C</code>: Clear Exclusion List</li>"
+            "<li><code>Ctrl+Shift+X</code>: Show Only Excluded Rows</li>"
+            "<li><code>Ctrl+Shift+N</code>: Show Only Non-Excluded Rows</li>"
+            "<li><code>Ctrl+Alt+R</code>: Clear Per-Row Exclusions</li>"
+            "<li><code>Ctrl+Alt+M</code>: Clear Per-Message Exclusions</li>"
+            "</ul></li>"
+    
+            "<li><b>Comment Menu</b>"
+            "<ul>"
+            "<li><code>Ctrl+Shift+M</code>: Show All Comments</li>"
+            "<li><code>Ctrl+Shift+Del</code>: Clear All Comments</li>"
+            "<li><code>Ctrl+Shift+R</code>: Clear Comment [ROW]</li>"
+            "<li><code>Ctrl+Shift+G</code>: Clear Comment [ALL ROW with this message]</li>"
+            "<li><code>Ctrl+Alt+M</code>: Show Only Commented Rows</li>"
+            "<li><code>Ctrl+Alt+N</code>: Show Only Non-Commented Rows</li>"
+            "</ul></li>"
+    
+            "<li><b>Log Menu</b>"
+            "<ul>"
+            "<li><code>Ctrl+1</code>: Show simulate.log</li>"
+            "<li><code>Ctrl+2</code>: Show compile.log</li>"
+            "<li><code>Ctrl+3</code>: Show Scoreboard Errors</li>"
+            "</ul></li>"
+    
+            "<li><b>Summary Menu</b>"
+            "<ul>"
+            "<li><code>Ctrl+S</code>: Show Summary</li>"
+            "<li><code>Ctrl+Shift+R</code>: Show Row Stats</li>"
+            "<li><code>Ctrl+Shift+A</code>: Show All Messages</li>"
+            "<li><code>Ctrl+Shift+F</code>: Show First Match Per Testcase</li>"
+            "<li><code>Ctrl+T</code>: Open Visualization Window</li>"
+            "</ul></li>"
+    
+            "<li><b>Session Menu</b>"
+            "<ul>"
+            "<li><code>Ctrl+Shift+S</code>: Save Session</li>"
+            "<li><code>Ctrl+Shift+O</code>: Load Session</li>"
+            "</ul></li>"
+    
+            "<li><b>Settings Menu</b>"
+            "<ul>"
+            "<li><code>Ctrl+D</code>: Dark Mode</li>"
+            "</ul></li>"
+    
+            "<li><b>Context Menu (Right-click on Table Row)</b>"
+            "<ul>"
+            "<li><code>Ctrl+Shift+C</code>: Copy Cell</li>"
+            "<li><code>Ctrl+X</code>: Exclude [This ROW only]</li>"
+            "<li><code>Ctrl+U</code>: Exclude [ALL ROW with this message]</li>"
+            "<li><code>Ctrl+Shift+M</code>: Show All Comments</li>"
+            "</ul></li>"
+    
+            "<li><b>Help Menu</b>"
+            "<ul>"
+            "<li><code>F1</code>: Shortcut Keys</li>"
+            "<li><code>F2</code>: Features</li>"
+            "<li><code>F3</code>: Author</li>"
+            "</ul></li>"
+    
+            "<li><b>Other Table Actions</b>"
+            "<ul>"
+            "<li><b>Multi-column sort:</b> <code>Shift+Click</code> on header</li>"
+            "<li><b>Filter columns:</b> Use filter row (no shortcut)</li>"
+            "</ul></li>"
+            "</ul>"
+            "<p><b>Tip:</b> You can also use the context menu (right-click) for quick actions.</p>"
+        )
+        dlg = HelpDialog("Shortcut Keys", html, self)
+        dlg.setStyleSheet(self.get_current_stylesheet())
+        dlg.exec_()
+
     def show_features(self):
         html = (
             "<h2>LogTriage Application – Features</h2>"
@@ -2271,10 +2343,16 @@ class LogTriageWindow(QMainWindow):
             "<li>Find dialog with regex support and row highlighting for quick search.</li>"
             "</ul></li>"
             "<li><b>Exclusion List Management</b><ul>"
-            "<li>Add messages to an exclusion list.</li>"
+            "<li>Add messages to an exclusion list (per-row or per-message) with keyboard shortcuts.</li>"
             "<li>View, import, export, and clear the exclusion list.</li>"
             "<li>Visual indication for excluded rows.</li>"
             "<li>Filter to show only excluded or only non-excluded rows.</li>"
+            "<li>Clear per-row or per-message exclusions with shortcuts.</li>"
+            "</ul></li>"
+            "<li><b>Comment Management</b><ul>"
+            "<li>Add, edit, and clear comments per-row or per-message.</li>"
+            "<li>Show all comments in a dedicated dialog.</li>"
+            "<li>Clear per-row or per-message comments with shortcuts.</li>"
             "</ul></li>"
             "<li><b>Summary and Statistics</b><ul>"
             "<li>Summary dialog: per-testcase/testopt counts for <b>ERROR</b>, <b>FATAL</b>, <b>WARNING</b> (total and unique).</li>"
@@ -2283,12 +2361,11 @@ class LogTriageWindow(QMainWindow):
             "<li><b>Visualization</b><ul>"
             "<li>Pie chart: Distribution of error types.</li>"
             "<li>Grouped bar chart: Error/Fatal/Warning counts by test case.</li>"
-            "<li>Heatmap: Error frequency by test case, with selectable color schemes and cell count annotations.</li>"
             "<li>Export all charts as images.</li>"
             "</ul></li>"
             "<li><b>User Interface and Usability</b><ul>"
             "<li>Dark mode toggle for comfortable viewing.</li>"
-            "<li>Keyboard shortcuts for all major actions (see Help &gt; Shortcut Keys).</li>"
+            "<li><b>Keyboard shortcuts for all major actions and context menus (see Help &gt; Shortcut Keys).</b></li>"
             "<li>Status bar shows current row count, unique count, and error statistics.</li>"
             "<li>Progress bar and status messages for long operations.</li>"
             "<li>Memory usage warning for large datasets.</li>"
@@ -2298,11 +2375,12 @@ class LogTriageWindow(QMainWindow):
             "<li>Help menu with shortcut keys, features, and author info.</li>"
             "</ul></li>"
             "</ol>"
+            "<p><b>Tip:</b> Right-click on any row to access context menu actions with shortcuts.</p>"
         )
         dlg = HelpDialog("Features", html, self)
-        dlg.setStyleSheet(self.get_current_stylesheet())  # <-- Add this line
+        dlg.setStyleSheet(self.get_current_stylesheet())
         dlg.exec_()
-    
+
     def show_author(self):
         html = (
             "LogTriage Application<br>"
