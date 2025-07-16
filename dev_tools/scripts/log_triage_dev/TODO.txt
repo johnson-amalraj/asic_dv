@@ -27,9 +27,6 @@ Table Performance:
   For very large datasets, consider switching from QTableWidget to QTableView with a custom QAbstractTableModel for better performance and memory efficiency.
   Use setUpdatesEnabled(False) before bulk updates and setUpdatesEnabled(True) after, to reduce flicker and speed up rendering.
 
-Resizable Columns:
-  Save and restore both column widths and column order.
-
 Drag-and-Drop:
   Allow users to drag log files or folders into the window to trigger loading.
 
@@ -127,6 +124,6 @@ Large File Loading:
 Patterns:
   License-related log issues need handling.
   GLS regression errors need to be handled.
-  Downgraded errors should be removed from the table (handled by default in some .csv)
+  Downgraded errors should be removed from the table (handled by default in some .json)
 
 --------------------------------------------------------------------------------------------------------------
