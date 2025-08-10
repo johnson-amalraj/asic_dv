@@ -1,1 +1,20 @@
+[Version]  [Date] [TIME] 
+  - <>
+  - <>
 
+5.0.0  03-August-2025 14:00:00 IST
+  - Splitted the code into multiple files <Keeping the logtraige.py until
+    stable version release>
+
+4.1.0  03-August-2025 13:34:00 IST
+  - Added the unit testing
+  - Added the MCHP logo to the tool
+
+4.1.0  17-July-2025 17:54:00 IST
+  - Fixed the issues in the Exclusions/Comments apply to All Row / Row per Messages
+  - Fixed the issues in the dark mode
+  - Updated the UI with modern look
+  - Cleaned up the shortcut keys
+  - Created the pattern files which will automatically load when tool launched
+  - Supports json import for exclusion, patterns and export the reports like sumamry, all details ans session as json format
+  - Updated the documents for the above updates

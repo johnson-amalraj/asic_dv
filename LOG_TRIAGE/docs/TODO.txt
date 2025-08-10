@@ -1,0 +1,111 @@
+--------------------------------------------------------------------------------------------------------------
+# Areas for Improvement & Suggestions
+--------------------------------------------------------------------------------------------------------------
+
+1. UI/UX
+
+Modern Look:
+  Add icons to menu actions for a more modern interface (optional).
+
+Table Performance:
+  For very large datasets, consider switching from QTableWidget to QTableView with a custom QAbstractTableModel for better performance and memory efficiency.
+  Use setUpdatesEnabled(False) before bulk updates and setUpdatesEnabled(True) after, to reduce flicker and speed up rendering.
+
+Drag-and-Drop:
+  Allow users to drag log files or folders into the window to trigger loading.
+
+2. Error Handling
+
+User Feedback:
+  Continue using QMessageBox for errors.
+  For long operations or critical errors, also log to the status bar for persistent feedback.
+
+Thread Safety:
+  Ensure all UI updates are performed in the main thread (as currently done via signals/slots).
+  In dialogs, catch exceptions and show user-friendly error messages.
+
+3. Code Quality
+
+Reduce Repetition:
+  Refactor repeated logic (e.g., exporting/importing, updating recent folders) into reusable functions.
+  Centralize color and tooltip logic.
+
+4. User Experience
+
+Feedback on Long Operations:
+  For very large datasets, consider a modal progress dialog or spinner to indicate ongoing work.
+
+Error Feedback:
+  When loading fails (e.g., bad patterns file), show a detailed error dialog with possible fixes.
+
+5. Python & PyQt5 Best Practices
+
+Signal/Slot Syntax:
+  Use new-style signal/slot syntax (signal.connect(slot)) everywhere for consistency.
+
+6. Documentation
+
+User Guide:
+  Generate a user guide (markdown or HTML) from the features dialog content.
+
+Developer Guide:
+  Document how to add new log patterns, extend the UI, or add new export formats.
+
+--------------------------------------------------------------------------------------------------------------
+# Minor Issues & Typos
+--------------------------------------------------------------------------------------------------------------
+
+- In parse_log_file, double-check regex patterns for VCS; avoid using $$ (not valid regex).
+- In LogParseWorker, refactor repeated show_scoreboard logic for each type.
+- In load_patterns_from_file and load_ignore_patterns_from_file, improve error handling for missing or malformed files.
+
+--------------------------------------------------------------------------------------------------------------
+# Future Ideas
+--------------------------------------------------------------------------------------------------------------
+
+Tagging System:
+  Allow users to tag log entries for categorization.
+
+Bulk Commenting:
+  When adding comments, allow applying to all rows with the same message.
+
+Code Refactoring:
+  After feature completion, split code into multiple files for re-use and maintainability.
+
+Command Line Interface (CLI):
+  For users who prefer scripting or automation.
+
+Auto-Triage Suggestions:
+  Use heuristics or ML to suggest likely causes or group similar issues.
+
+Integration Hooks:
+  Integrate with bug tracking tools (e.g., JIRA) or CI/CD pipelines.
+
+Plugin System:
+  Allow users to add custom log parsers or visualizations.
+
+Remote Log Loading:
+  Support loading logs from remote servers.
+
+Automated Report Generation:
+  Generate PDF/HTML reports from filtered data.
+
+Regression Comparison:
+  Add ability to compare results between different regressions.
+
+--------------------------------------------------------------------------------------------------------------
+# Known Issues
+--------------------------------------------------------------------------------------------------------------
+
+Large File Loading:
+  Performance issues with very large log files (e.g., /home/data/mpu32_simulation/simulation_logs/MUSTANG_ST012_A0_HPP_PSS_rtl5p2_eco0/RTL_2025_06_12/max/puf-UPF_ALLON_PUFON_2-CPU600_MSS200_DDR800_ISS266-ID2800345-20250612T152452Z/simulate.log).
+
+Patterns:
+  License-related log issues need handling.
+  GLS regression errors need to be handled.
+  Downgraded errors should be removed from the table (handled by default in some .json)
+
+Log Filter:
+  Not working once the log files/session loaded
+
+--------------------------------------------------------------------------------------------------------------
