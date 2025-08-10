@@ -1,0 +1,102 @@
+[
+  {
+    "Test Case": "vdec_test",
+    "Test Option": "TEST_3552",
+    "ERROR": "11",
+    "ERROR (unique)": "7",
+    "FATAL": "0",
+    "FATAL (unique)": "0",
+    "WARNING": "12",
+    "WARNING (unique)": "12"
+  },
+  {
+    "Test Case": "vdec_test",
+    "Test Option": "TEST_8581_LONG",
+    "ERROR": "11",
+    "ERROR (unique)": "7",
+    "FATAL": "0",
+    "FATAL (unique)": "0",
+    "WARNING": "12",
+    "WARNING (unique)": "12"
+  },
+  {
+    "Test Case": "venc_test",
+    "Test Option": "TEST_1180_LONG",
+    "ERROR": "9",
+    "ERROR (unique)": "7",
+    "FATAL": "0",
+    "FATAL (unique)": "0",
+    "WARNING": "11",
+    "WARNING (unique)": "11"
+  },
+  {
+    "Test Case": "venc_test",
+    "Test Option": "TEST_1534_LONG",
+    "ERROR": "9",
+    "ERROR (unique)": "7",
+    "FATAL": "0",
+    "FATAL (unique)": "0",
+    "WARNING": "11",
+    "WARNING (unique)": "11"
+  },
+  {
+    "Test Case": "venc_test",
+    "Test Option": "TEST_1744_LONG",
+    "ERROR": "11",
+    "ERROR (unique)": "7",
+    "FATAL": "0",
+    "FATAL (unique)": "0",
+    "WARNING": "12",
+    "WARNING (unique)": "12"
+  },
+  {
+    "Test Case": "venc_test",
+    "Test Option": "TEST_1745_LONG",
+    "ERROR": "9",
+    "ERROR (unique)": "7",
+    "FATAL": "0",
+    "FATAL (unique)": "0",
+    "WARNING": "11",
+    "WARNING (unique)": "11"
+  },
+  {
+    "Test Case": "venc_test",
+    "Test Option": "TEST_1978_LONG",
+    "ERROR": "11",
+    "ERROR (unique)": "7",
+    "FATAL": "0",
+    "FATAL (unique)": "0",
+    "WARNING": "12",
+    "WARNING (unique)": "12"
+  },
+  {
+    "Test Case": "venc_test",
+    "Test Option": "TEST_4359_LONG",
+    "ERROR": "11",
+    "ERROR (unique)": "7",
+    "FATAL": "0",
+    "FATAL (unique)": "0",
+    "WARNING": "12",
+    "WARNING (unique)": "12"
+  },
+  {
+    "Test Case": "msadcc",
+    "Test Option": "UPF_ALLON_MIPIOFF",
+    "ERROR": "2",
+    "ERROR (unique)": "2",
+    "FATAL": "1",
+    "FATAL (unique)": "1",
+    "WARNING": "31",
+    "WARNING (unique)": "31"
+  },
+  {
+    "Test Case": "venc_test",
+    "Test Option": "default",
+    "ERROR": "7",
+    "ERROR (unique)": "5",
+    "FATAL": "0",
+    "FATAL (unique)": "0",
+    "WARNING": "11",
+    "WARNING (unique)": "11"
+  }
+]
