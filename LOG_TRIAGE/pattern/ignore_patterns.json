@@ -1,0 +1,3 @@
+[
+  "^Number of (demoted|caught) UVM_(FATAL|ERROR|WARNING) reports\\s*:\\s*\\d+"
+]
